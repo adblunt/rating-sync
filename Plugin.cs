@@ -2092,26 +2092,44 @@ namespace RatingSync
                     result.UsedOmdb = true;
                 }
                 
-                // Fallback: Scrape IMDb directly if enabled and no rating found
+                // Fallback: use api.imdbapi.dev (unofficial IMDb API, no key required) if enabled and no rating found.
+                // This bypasses the AWS WAF that now blocks direct IMDb scraping.
                 if (!result.CommunityRating.HasValue && config.EnableImdbScraping)
                 {
                     result.ImdbScrapeAttempted = true;
-                    float? scrapedRating = null;
+                    float? apiRating = null;
 
-                    // Prefer scraping an explicit episode IMDb id if Emby provides it.
                     if (!string.IsNullOrWhiteSpace(imdbId))
                     {
-                        scrapedRating = await ScrapeImdbRating(imdbId);
+                        // Prefer querying the episode's own tt-id directly.
+                        apiRating = await FetchImdbApiDevRating(imdbId);
+                    }
+
+                    if (!apiRating.HasValue && !string.IsNullOrWhiteSpace(episodeInfo.SeriesImdbId))
+                    {
+                        // Fall back to the season list endpoint to find this episode.
+                        apiRating = await FetchImdbApiDevEpisodeRating(episodeInfo.SeriesImdbId, episodeInfo.SeasonNumber, episodeInfo.EpisodeNumber);
+                    }
+
+                    if (apiRating.HasValue)
+                    {
+                        result.CommunityRating = apiRating;
+                        result.UsedScraping = true;
                     }
                     else
                     {
-                        // If Emby doesn't provide episode IDs, derive the episode title id from the series episodes page.
-                        scrapedRating = await ScrapeImdbEpisodeRating(episodeInfo);
-                    }
-                    if (scrapedRating.HasValue)
-                    {
-                        result.CommunityRating = scrapedRating;
-                        result.UsedScraping = true;
+                        // Last resort: try direct HTML scraping (may be blocked by WAF).
+                        float? scrapedRating = null;
+                        if (!string.IsNullOrWhiteSpace(imdbId))
+                            scrapedRating = await ScrapeImdbRating(imdbId);
+                        else
+                            scrapedRating = await ScrapeImdbEpisodeRating(episodeInfo);
+
+                        if (scrapedRating.HasValue)
+                        {
+                            result.CommunityRating = scrapedRating;
+                            result.UsedScraping = true;
+                        }
                     }
                 }
                 return result;
@@ -2188,6 +2206,28 @@ namespace RatingSync
                     break;
             }
 
+            // Fallback for movies/series: use api.imdbapi.dev if scraping is enabled
+            // and the configured sources still haven't returned a community rating.
+            if (!result.CommunityRating.HasValue && config.EnableImdbScraping && !string.IsNullOrWhiteSpace(imdbId))
+            {
+                var apiRating = await FetchImdbApiDevRating(imdbId);
+                if (apiRating.HasValue)
+                {
+                    result.CommunityRating = apiRating;
+                    result.UsedScraping = true;
+                }
+                else
+                {
+                    // Last resort: direct HTML scrape (may be blocked by WAF).
+                    var scrapedRating = await ScrapeImdbRating(imdbId);
+                    if (scrapedRating.HasValue)
+                    {
+                        result.CommunityRating = scrapedRating;
+                        result.UsedScraping = true;
+                    }
+                }
+            }
+
             return result;
         }
 
@@ -2204,8 +2244,12 @@ namespace RatingSync
                     string url;
                     if (episodeInfo != null)
                     {
-                        // Episode-specific lookup using series IMDb ID + season/episode
-                        url = $"http://www.omdbapi.com/?i={episodeInfo.SeriesImdbId}&Season={episodeInfo.SeasonNumber}&Episode={episodeInfo.EpisodeNumber}&apikey={apiKey}";
+                        // If Emby has the episode's own IMDb ID, query it directly — this gives
+                        // OMDb the best chance of returning up-to-date data for recent episodes.
+                        if (!string.IsNullOrWhiteSpace(imdbId))
+                            url = $"http://www.omdbapi.com/?i={imdbId}&apikey={apiKey}";
+                        else
+                            url = $"http://www.omdbapi.com/?i={episodeInfo.SeriesImdbId}&Season={episodeInfo.SeasonNumber}&Episode={episodeInfo.EpisodeNumber}&apikey={apiKey}";
                     }
                     else
                     {
@@ -2249,6 +2293,7 @@ namespace RatingSync
                             }
                         }
                     }
+
                 }
             }
             catch (TaskCanceledException)
@@ -2342,6 +2387,62 @@ namespace RatingSync
             return result;
         }
 
+        // Fetch the IMDb rating for any title (episode, movie, series) via api.imdbapi.dev.
+        // This unofficial API mirrors live IMDb data and is not subject to the AWS WAF
+        // that now blocks direct imdb.com requests.
+        private async Task<float?> FetchImdbApiDevRating(string imdbId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(imdbId))
+                    return null;
+
+                using (var client = new HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                    var url = $"https://api.imdbapi.dev/titles/{imdbId}";
+                    var response = await client.GetAsync(url);
+                    if (!response.IsSuccessStatusCode)
+                        return null;
+
+                    var body = await response.Content.ReadAsStringAsync();
+                    var data = _jsonSerializer.DeserializeFromString<ImdbApiDevTitleResponse>(body);
+                    if (data?.rating?.aggregateRating.HasValue == true && data.rating.aggregateRating.Value >= 1)
+                        return data.rating.aggregateRating.Value;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        // Fetch an episode's IMDb rating via the season-episode list endpoint on api.imdbapi.dev.
+        // Used when Emby doesn't supply an episode-level IMDb ID.
+        private async Task<float?> FetchImdbApiDevEpisodeRating(string seriesImdbId, int seasonNumber, int episodeNumber)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(seriesImdbId) || seasonNumber <= 0 || episodeNumber <= 0)
+                    return null;
+
+                using (var client = new HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                    var url = $"https://api.imdbapi.dev/titles/{seriesImdbId}/episodes?season={seasonNumber}";
+                    var response = await client.GetAsync(url);
+                    if (!response.IsSuccessStatusCode)
+                        return null;
+
+                    var body = await response.Content.ReadAsStringAsync();
+                    var data = _jsonSerializer.DeserializeFromString<ImdbApiDevEpisodesResponse>(body);
+                    var ep = data?.episodes?.FirstOrDefault(e => e.episodeNumber == episodeNumber);
+                    if (ep?.rating?.aggregateRating.HasValue == true && ep.rating.aggregateRating.Value >= 1)
+                        return ep.rating.aggregateRating.Value;
+                }
+            }
+            catch { }
+            return null;
+        }
+
         private async Task<float?> ScrapeImdbRating(string imdbId)
         {
             try
@@ -2352,8 +2453,10 @@ namespace RatingSync
                 using (var client = new HttpClient())
                 {
                     client.Timeout = TimeSpan.FromSeconds(10);
-                    client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+                    client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+                    client.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
                     client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
+                    client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
                     
                     var url = $"https://www.imdb.com/title/{imdbId}/";
                     var response = await client.GetAsync(url);
@@ -2471,8 +2574,10 @@ namespace RatingSync
                 using (var client = new HttpClient())
                 {
                     client.Timeout = TimeSpan.FromSeconds(10);
-                    client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+                    client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+                    client.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
                     client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
+                    client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
 
                     var url = $"https://www.imdb.com/title/{seriesImdbId}/episodes?season={seasonNumber}";
                     var response = await client.GetAsync(url);
@@ -2599,6 +2704,30 @@ namespace RatingSync
         {
             public string Source { get; set; }
             public string Value { get; set; }
+        }
+
+        private class ImdbApiDevRating
+        {
+            public float? aggregateRating { get; set; }
+            public int? voteCount { get; set; }
+        }
+
+        private class ImdbApiDevTitleResponse
+        {
+            public string id { get; set; }
+            public ImdbApiDevRating rating { get; set; }
+        }
+
+        private class ImdbApiDevEpisodesResponse
+        {
+            public List<ImdbApiDevEpisodeEntry> episodes { get; set; }
+        }
+
+        private class ImdbApiDevEpisodeEntry
+        {
+            public string id { get; set; }
+            public int? episodeNumber { get; set; }
+            public ImdbApiDevRating rating { get; set; }
         }
 
         private class MdbListResponse
