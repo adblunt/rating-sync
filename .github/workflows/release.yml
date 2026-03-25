@@ -74,7 +74,7 @@ jobs:
             $escaped = [regex]::Escape($version)
             $start = -1
             for ($i = 0; $i -lt $lines.Count; $i++) {
-              if ($lines[$i] -match "^##\s+\[$escaped\]\b") { $start = $i; break }
+              if ($lines[$i] -match "^##\s+\[$escaped\]") { $start = $i; break }
             }
 
             if ($start -ge 0) {
