@@ -4,6 +4,7 @@
 
 <h1 align="center">Rating Sync</h1>
 
+<p align="center">
 	An Emby plugin to sync <b>IMDb/Popcorn community ratings</b> and <b>Rotten Tomatoes critic ratings</b> into your library metadata.
 	<br />
 	Smart scanning • Rate limiting • Progress tracking • Scan history
