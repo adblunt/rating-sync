@@ -1885,7 +1885,7 @@ namespace RatingSync
                         CommunityRatingSource targetSource = CommunityRatingSource.IMDb;
                         if (item is Movie) targetSource = config.MoviesRatingSource;
                         else if (item is MediaBrowser.Controller.Entities.TV.Series) targetSource = config.SeriesRatingSource;
-                        else if (item is Episode) targetSource = config.EpisodesRatingSource;
+                        else if (item is Episode) targetSource = CommunityRatingSource.IMDb;
                         
                         var ratings = await FetchRatings(imdbId, config, targetSource, episodeInfo, currentHasOmdb, currentHasMdbList);
                         
