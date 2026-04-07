@@ -1003,6 +1003,11 @@ namespace RatingSync
         public RatingSource PreferredSource { get; set; }
         public bool UpdateCriticRating { get; set; }
         
+        // Community Rating Source configured by item type
+        public CommunityRatingSource MoviesRatingSource { get; set; }
+        public CommunityRatingSource SeriesRatingSource { get; set; }
+        public CommunityRatingSource EpisodesRatingSource { get; set; }
+        
         // Item Types
         public bool UpdateMovies { get; set; }
         public bool UpdateSeries { get; set; }
@@ -1030,6 +1035,9 @@ namespace RatingSync
             MdbListDailyLimit = 1000;
             PreferredSource = RatingSource.OMDb;
             UpdateCriticRating = true;
+            MoviesRatingSource = CommunityRatingSource.IMDb;
+            SeriesRatingSource = CommunityRatingSource.IMDb;
+            EpisodesRatingSource = CommunityRatingSource.IMDb;
             UpdateMovies = true;
             UpdateSeries = true;
             UpdateEpisodes = false;
@@ -1047,6 +1055,12 @@ namespace RatingSync
         OMDb,
         MDBList,
         Both
+    }
+
+    public enum CommunityRatingSource
+    {
+        IMDb,
+        Popcorn
     }
 
     #endregion
@@ -1868,7 +1882,12 @@ namespace RatingSync
                             : (episodeInfo != null ? episodeInfo.SeriesImdbId : "");
                         Log($"Processing: {itemName} ({logImdbId})", "info");
                         
-                        var ratings = await FetchRatings(imdbId, config, episodeInfo, currentHasOmdb, currentHasMdbList);
+                        CommunityRatingSource targetSource = CommunityRatingSource.IMDb;
+                        if (item is Movie) targetSource = config.MoviesRatingSource;
+                        else if (item is MediaBrowser.Controller.Entities.TV.Series) targetSource = config.SeriesRatingSource;
+                        else if (item is Episode) targetSource = config.EpisodesRatingSource;
+                        
+                        var ratings = await FetchRatings(imdbId, config, targetSource, episodeInfo, currentHasOmdb, currentHasMdbList);
                         
                         // Track API calls
                         if (ratings.UsedOmdb)
@@ -1910,7 +1929,8 @@ namespace RatingSync
                             {
                                 item.CommunityRating = ratings.CommunityRating.Value;
                                 itemUpdated = true;
-                                changes.Add($"IMDb: {(oldRating.HasValue ? oldRating.Value.ToString("F1") : "none")} → {ratings.CommunityRating.Value:F1} ({sourceLabel})");
+                                var communityLogName = targetSource == CommunityRatingSource.Popcorn ? "Popcorn" : "IMDb";
+                                changes.Add($"{communityLogName}: {(oldRating.HasValue ? oldRating.Value.ToString("F1") : "none")} → {ratings.CommunityRating.Value:F1} ({sourceLabel})");
                             }
                         }
 
@@ -1950,9 +1970,10 @@ namespace RatingSync
                             }
                             else
                             {
+                                var communityLogName = targetSource == CommunityRatingSource.Popcorn ? "Popcorn" : "IMDb";
                                 if (ratings.CommunityRating.HasValue && item.CommunityRating == ratings.CommunityRating.Value)
                                 {
-                                    skipReasons.Add($"IMDb unchanged ({item.CommunityRating:F1})");
+                                    skipReasons.Add($"{communityLogName} unchanged ({item.CommunityRating:F1})");
                                 }
                                 if (config.UpdateCriticRating && ratings.CriticRating.HasValue && item.CriticRating == ratings.CriticRating.Value)
                                 {
@@ -1960,7 +1981,7 @@ namespace RatingSync
                                 }
                                 if (!ratings.CommunityRating.HasValue)
                                 {
-                                    skipReasons.Add("No IMDb rating in API");
+                                    skipReasons.Add($"No {communityLogName} rating in API");
                                 }
                                 if (config.UpdateCriticRating && !ratings.CriticRating.HasValue)
                                 {
@@ -2077,7 +2098,7 @@ namespace RatingSync
             }
         }
 
-        private async Task<RatingData> FetchRatings(string imdbId, PluginConfiguration config, EpisodeInfo episodeInfo, bool canUseOmdb, bool canUseMdbList)
+        private async Task<RatingData> FetchRatings(string imdbId, PluginConfiguration config, CommunityRatingSource targetSource, EpisodeInfo episodeInfo, bool canUseOmdb, bool canUseMdbList)
         {
             var result = new RatingData();
 
@@ -2086,7 +2107,7 @@ namespace RatingSync
             {
                 if (canUseOmdb && !string.IsNullOrEmpty(config.OmdbApiKey))
                 {
-                    var omdbData = await FetchFromOmdb(imdbId, config.OmdbApiKey, episodeInfo);
+                    var omdbData = await FetchFromOmdb(imdbId, config.OmdbApiKey, targetSource, episodeInfo);
                     result.CommunityRating = omdbData.CommunityRating;
                     result.CriticRating = omdbData.CriticRating;
                     result.UsedOmdb = true;
@@ -2140,7 +2161,7 @@ namespace RatingSync
                 case RatingSource.OMDb:
                     if (canUseOmdb && !string.IsNullOrEmpty(config.OmdbApiKey))
                     {
-                        var omdbData = await FetchFromOmdb(imdbId, config.OmdbApiKey, episodeInfo);
+                        var omdbData = await FetchFromOmdb(imdbId, config.OmdbApiKey, targetSource, episodeInfo);
                         result.CommunityRating = omdbData.CommunityRating;
                         result.CriticRating = omdbData.CriticRating;
                         result.UsedOmdb = true;
@@ -2151,7 +2172,7 @@ namespace RatingSync
                                            (config.UpdateCriticRating && !result.CriticRating.HasValue);
                     if (needsMdbFallback && canUseMdbList && !string.IsNullOrEmpty(config.MdbListApiKey))
                     {
-                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, episodeInfo);
+                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, targetSource, episodeInfo);
                         if (!result.CommunityRating.HasValue && mdbData.CommunityRating.HasValue)
                             result.CommunityRating = mdbData.CommunityRating;
                         if (!result.CriticRating.HasValue && mdbData.CriticRating.HasValue)
@@ -2163,7 +2184,7 @@ namespace RatingSync
                 case RatingSource.MDBList:
                     if (canUseMdbList && !string.IsNullOrEmpty(config.MdbListApiKey))
                     {
-                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, episodeInfo);
+                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, targetSource, episodeInfo);
                         result.CommunityRating = mdbData.CommunityRating;
                         result.CriticRating = mdbData.CriticRating;
                         result.UsedMdbList = true;
@@ -2174,7 +2195,7 @@ namespace RatingSync
                                             (config.UpdateCriticRating && !result.CriticRating.HasValue);
                     if (needsOmdbFallback && canUseOmdb && !string.IsNullOrEmpty(config.OmdbApiKey))
                     {
-                        var omdbData = await FetchFromOmdb(imdbId, config.OmdbApiKey, episodeInfo);
+                        var omdbData = await FetchFromOmdb(imdbId, config.OmdbApiKey, targetSource, episodeInfo);
                         if (!result.CommunityRating.HasValue && omdbData.CommunityRating.HasValue)
                             result.CommunityRating = omdbData.CommunityRating;
                         if (!result.CriticRating.HasValue && omdbData.CriticRating.HasValue)
@@ -2187,7 +2208,7 @@ namespace RatingSync
                     // Query both APIs - OMDb first, then MDBList for any missing data
                     if (canUseOmdb && !string.IsNullOrEmpty(config.OmdbApiKey))
                     {
-                        var omdbData = await FetchFromOmdb(imdbId, config.OmdbApiKey, episodeInfo);
+                        var omdbData = await FetchFromOmdb(imdbId, config.OmdbApiKey, targetSource, episodeInfo);
                         result.CommunityRating = omdbData.CommunityRating;
                         result.CriticRating = omdbData.CriticRating;
                         result.UsedOmdb = true;
@@ -2196,7 +2217,7 @@ namespace RatingSync
                     // Only call MDBList if we're missing data
                     if ((!result.CommunityRating.HasValue || !result.CriticRating.HasValue) && canUseMdbList && !string.IsNullOrEmpty(config.MdbListApiKey))
                     {
-                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, episodeInfo);
+                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, targetSource, episodeInfo);
                         if (!result.CommunityRating.HasValue && mdbData.CommunityRating.HasValue)
                             result.CommunityRating = mdbData.CommunityRating;
                         if (!result.CriticRating.HasValue && mdbData.CriticRating.HasValue)
@@ -2231,7 +2252,7 @@ namespace RatingSync
             return result;
         }
 
-        private async Task<RatingData> FetchFromOmdb(string imdbId, string apiKey, EpisodeInfo episodeInfo = null)
+        private async Task<RatingData> FetchFromOmdb(string imdbId, string apiKey, CommunityRatingSource targetSource, EpisodeInfo episodeInfo = null)
         {
             var result = new RatingData();
             
@@ -2268,13 +2289,16 @@ namespace RatingSync
 
                     if (data != null && data.Response == "True")
                     {
-                        // IMDb Rating
-                        if (!string.IsNullOrEmpty(data.imdbRating) && data.imdbRating != "N/A")
+                        // Community Rating
+                        if (targetSource == CommunityRatingSource.IMDb)
                         {
-                            if (float.TryParse(data.imdbRating, System.Globalization.NumberStyles.Float,
-                                System.Globalization.CultureInfo.InvariantCulture, out var rating))
+                            if (!string.IsNullOrEmpty(data.imdbRating) && data.imdbRating != "N/A")
                             {
-                                result.CommunityRating = rating;
+                                if (float.TryParse(data.imdbRating, System.Globalization.NumberStyles.Float,
+                                    System.Globalization.CultureInfo.InvariantCulture, out var rating))
+                                {
+                                    result.CommunityRating = rating;
+                                }
                             }
                         }
 
@@ -2308,7 +2332,7 @@ namespace RatingSync
             return result;
         }
 
-        private async Task<RatingData> FetchFromMdbList(string imdbId, string apiKey, EpisodeInfo episodeInfo = null)
+        private async Task<RatingData> FetchFromMdbList(string imdbId, string apiKey, CommunityRatingSource targetSource, EpisodeInfo episodeInfo = null)
         {
             var result = new RatingData();
             
@@ -2358,20 +2382,36 @@ namespace RatingSync
 
                     if (data != null && data.ratings != null && data.ratings.Count > 0)
                     {
-                        // Find IMDb rating in the ratings array
-                        var imdbRating = data.ratings.FirstOrDefault(r => r.source == "imdb");
-                        if (imdbRating != null && imdbRating.value.HasValue && imdbRating.value.Value > 0)
+                        Func<string, MdbListRating> findRating = sourceName =>
+                            data.ratings.FirstOrDefault(r =>
+                                !string.IsNullOrWhiteSpace(r.source) &&
+                                string.Equals(r.source, sourceName, StringComparison.OrdinalIgnoreCase));
+
+                        // Community Rating
+                        if (targetSource == CommunityRatingSource.Popcorn)
                         {
-                            result.CommunityRating = imdbRating.value.Value;
+                            var popcornRating = findRating("popcorn");
+                            if (popcornRating != null && popcornRating.value.HasValue && popcornRating.value.Value > 0)
+                            {
+                                result.CommunityRating = popcornRating.value.Value / 10f;
+                            }
                         }
-                        else if (data.score.HasValue && data.score.Value > 0)
+                        else
                         {
-                            // Use MDBList score as fallback (normalized 0-100, convert to 0-10)
-                            result.CommunityRating = data.score.Value / 10f;
+                            var imdbRating = findRating("imdb");
+                            if (imdbRating != null && imdbRating.value.HasValue && imdbRating.value.Value > 0)
+                            {
+                                result.CommunityRating = imdbRating.value.Value;
+                            }
+                            else if (data.score.HasValue && data.score.Value > 0)
+                            {
+                                // Use MDBList score as fallback (normalized 0-100, convert to 0-10)
+                                result.CommunityRating = data.score.Value / 10f;
+                            }
                         }
 
                         // Find Rotten Tomatoes rating in the ratings array
-                        var rtRating = data.ratings.FirstOrDefault(r => r.source == "tomatoes");
+                        var rtRating = findRating("tomatoes");
                         if (rtRating != null && rtRating.value.HasValue && rtRating.value.Value > 0)
                         {
                             result.CriticRating = rtRating.value.Value;

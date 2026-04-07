@@ -4,8 +4,7 @@
 
 <h1 align="center">Rating Sync</h1>
 
-<p align="center">
-	An Emby plugin to sync <b>IMDb community ratings</b> and <b>Rotten Tomatoes critic ratings</b> into your library metadata.
+	An Emby plugin to sync <b>IMDb/Popcorn community ratings</b> and <b>Rotten Tomatoes critic ratings</b> into your library metadata.
 	<br />
 	Smart scanning • Rate limiting • Progress tracking • Scan history
 </p>
@@ -28,6 +27,7 @@
 ## Features
 
 - Updates **Movies**, **Series**, and optionally **Episodes**
+- Configurable **Community Rating source** per media type (IMDb vs Rotten Tomatoes Audience/Popcorn)
 - Supports **OMDb** and/or **MDBList** (configurable preferred source)
 - Optional **IMDb scraping fallback** for episode ratings
 - Built-in **rate limiting** + daily limits per API

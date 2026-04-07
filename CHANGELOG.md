@@ -4,9 +4,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
-## [Unreleased]
+## [1.0.3] - 2026-04-07
 
-- TBD
+- Feature: Allow configuring the Community Rating source per media type (Movies, TV Series, Episodes).
+- Feature: Added support for Rotten Tomatoes Audience (Popcorn) scores via MDBList API for Emby's Community Rating.
 
 ## [1.0.2] - 2026-03-25
 

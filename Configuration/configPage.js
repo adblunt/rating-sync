@@ -472,13 +472,27 @@ function (BaseView, loading, toast) {
                 view.querySelector('#txtOmdbApiKey').value = config.OmdbApiKey || '';
                 view.querySelector('#txtMdbListApiKey').value = config.MdbListApiKey || '';
                 
-                // Handle PreferredSource - could be number or string
                 var sourceValue = config.PreferredSource;
                 if (typeof sourceValue === 'number') {
                     var sourceMap = ['OMDb', 'MDBList', 'Both'];
                     sourceValue = sourceMap[sourceValue] || 'OMDb';
                 }
                 view.querySelector('#selectPreferredSource').value = sourceValue || 'OMDb';
+                
+                var communitySourceMapArray = ['IMDb', 'Popcorn'];
+                
+                var moviesRatingValue = config.MoviesRatingSource;
+                if (typeof moviesRatingValue === 'number') moviesRatingValue = communitySourceMapArray[moviesRatingValue];
+                view.querySelector('#selectMoviesRatingSource').value = moviesRatingValue || 'IMDb';
+
+                var seriesRatingValue = config.SeriesRatingSource;
+                if (typeof seriesRatingValue === 'number') seriesRatingValue = communitySourceMapArray[seriesRatingValue];
+                view.querySelector('#selectSeriesRatingSource').value = seriesRatingValue || 'IMDb';
+
+                var episodesRatingValue = config.EpisodesRatingSource;
+                if (typeof episodesRatingValue === 'number') episodesRatingValue = communitySourceMapArray[episodesRatingValue];
+                view.querySelector('#selectEpisodesRatingSource').value = episodesRatingValue || 'IMDb';
+
                 
                 view.querySelector('#chkUpdateCriticRating').checked = config.UpdateCriticRating !== false;
                 view.querySelector('#chkUpdateMovies').checked = config.UpdateMovies !== false;
@@ -523,6 +537,11 @@ function (BaseView, loading, toast) {
                 var sourceStr = view.querySelector('#selectPreferredSource').value;
                 var sourceMap = { 'OMDb': 0, 'MDBList': 1, 'Both': 2 };
                 config.PreferredSource = sourceMap[sourceStr] !== undefined ? sourceMap[sourceStr] : 0;
+                
+                var communitySourceMap = { 'IMDb': 0, 'Popcorn': 1 };
+                config.MoviesRatingSource = communitySourceMap[view.querySelector('#selectMoviesRatingSource').value] || 0;
+                config.SeriesRatingSource = communitySourceMap[view.querySelector('#selectSeriesRatingSource').value] || 0;
+                config.EpisodesRatingSource = communitySourceMap[view.querySelector('#selectEpisodesRatingSource').value] || 0;
                 
                 config.UpdateCriticRating = view.querySelector('#chkUpdateCriticRating').checked;
                 config.UpdateMovies = view.querySelector('#chkUpdateMovies').checked;
