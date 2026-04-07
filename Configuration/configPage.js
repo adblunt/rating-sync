@@ -491,10 +491,12 @@ function (BaseView, loading, toast) {
 
                 var episodesRatingValue = config.EpisodesRatingSource;
                 if (typeof episodesRatingValue === 'number') episodesRatingValue = communitySourceMapArray[episodesRatingValue];
-                view.querySelector('#selectEpisodesRatingSource').value = episodesRatingValue || 'IMDb';
+                view.querySelector('#selectEpisodesRatingSource').value = 'IMDb';
 
                 
+                view.querySelector('#chkUpdateCommunityRating').checked = config.UpdateCommunityRating !== false;
                 view.querySelector('#chkUpdateCriticRating').checked = config.UpdateCriticRating !== false;
+                view.querySelector('#chkAllowAlternateSourceFallback').checked = config.AllowAlternateSourceFallback !== false;
                 view.querySelector('#chkUpdateMovies').checked = config.UpdateMovies !== false;
                 view.querySelector('#chkUpdateSeries').checked = config.UpdateSeries !== false;
                 view.querySelector('#chkUpdateEpisodes').checked = config.UpdateEpisodes === true;
@@ -541,9 +543,12 @@ function (BaseView, loading, toast) {
                 var communitySourceMap = { 'IMDb': 0, 'Popcorn': 1 };
                 config.MoviesRatingSource = communitySourceMap[view.querySelector('#selectMoviesRatingSource').value] || 0;
                 config.SeriesRatingSource = communitySourceMap[view.querySelector('#selectSeriesRatingSource').value] || 0;
-                config.EpisodesRatingSource = communitySourceMap[view.querySelector('#selectEpisodesRatingSource').value] || 0;
+                // Episodes are always IMDb because MDBList has no episode Popcorn data.
+                config.EpisodesRatingSource = 0;
                 
+                config.UpdateCommunityRating = view.querySelector('#chkUpdateCommunityRating').checked;
                 config.UpdateCriticRating = view.querySelector('#chkUpdateCriticRating').checked;
+                config.AllowAlternateSourceFallback = view.querySelector('#chkAllowAlternateSourceFallback').checked;
                 config.UpdateMovies = view.querySelector('#chkUpdateMovies').checked;
                 config.UpdateSeries = view.querySelector('#chkUpdateSeries').checked;
                 config.UpdateEpisodes = view.querySelector('#chkUpdateEpisodes').checked;

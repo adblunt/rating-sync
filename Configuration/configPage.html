@@ -266,12 +266,24 @@
                         <div class="selectContainer">
                             <label class="selectLabel" for="selectPreferredSource">Preferred Rating Source</label>
                             <select id="selectPreferredSource" is="emby-select">
-                                <option value="OMDb">OMDb (fallback to MDBList)</option>
-                                <option value="MDBList">MDBList (fallback to OMDb)</option>
+                                <option value="OMDb">OMDb</option>
+                                <option value="MDBList">MDBList</option>
                                 <option value="Both">Both (query simultaneously)</option>
                             </select>
-                            <div class="fieldDescription">Choose which source to prioritize. If a rating isn't found, the other source will be tried.</div>
+                            <div class="fieldDescription">Choose which source to prioritize for ratings.</div>
                         </div>
+
+                        <label class="checkboxContainer">
+                            <input type="checkbox" is="emby-checkbox" id="chkAllowAlternateSourceFallback" />
+                            <span>Allow fallback to alternate API source</span>
+                        </label>
+                        <div class="fieldDescription" style="margin-bottom: 1.2em;">When enabled, missing ratings can be filled by the other API (OMDb or MDBList). Disable for strict source-only mode.</div>
+
+                        <label class="checkboxContainer">
+                            <input type="checkbox" is="emby-checkbox" id="chkUpdateCommunityRating" />
+                            <span>Update Community Rating</span>
+                        </label>
+                        <div class="fieldDescription" style="margin-bottom: 0.8em;">When enabled, updates Emby's Community Rating using your per-type source settings.</div>
 
                         <label class="checkboxContainer">
                             <input type="checkbox" is="emby-checkbox" id="chkUpdateCriticRating" />
@@ -303,12 +315,11 @@
                                 <label class="selectLabel" for="selectEpisodesRatingSource">Episodes</label>
                                 <select id="selectEpisodesRatingSource" is="emby-select">
                                     <option value="IMDb">IMDb</option>
-                                    <option value="Popcorn">Rotten Tomatoes Audience (Popcorn)</option>
                                 </select>
                             </div>
                         </div>
                         <div class="infoBox">
-                            <strong>Note:</strong> MDBList does not currently support queries for individual TV Episodes. If you set Episodes to <em>Popcorn</em>, they will not receive a Community Rating. It is highly recommended to leave Episodes set to <em>IMDb</em>.
+                            <strong>Note:</strong> Episodes are always mapped to <em>IMDb</em> for Community Rating. MDBList does not currently support episode-level lookups for Popcorn.
                         </div>
                     </div>
 

@@ -1001,6 +1001,8 @@ namespace RatingSync
         
         // Rating Options
         public RatingSource PreferredSource { get; set; }
+        public bool AllowAlternateSourceFallback { get; set; }
+        public bool UpdateCommunityRating { get; set; }
         public bool UpdateCriticRating { get; set; }
         
         // Community Rating Source configured by item type
@@ -1034,6 +1036,8 @@ namespace RatingSync
             MdbListRateLimitEnabled = true;
             MdbListDailyLimit = 1000;
             PreferredSource = RatingSource.OMDb;
+            AllowAlternateSourceFallback = true;
+            UpdateCommunityRating = true;
             UpdateCriticRating = true;
             MoviesRatingSource = CommunityRatingSource.IMDb;
             SeriesRatingSource = CommunityRatingSource.IMDb;
@@ -1608,6 +1612,9 @@ namespace RatingSync
 
         private static readonly object _imdbEpisodeCacheLock = new object();
         private static readonly Dictionary<string, Dictionary<int, string>> _imdbEpisodeIdCache = new Dictionary<string, Dictionary<int, string>>();
+        private static readonly object _mdbListRateLimitLock = new object();
+        private static DateTime? _mdbListBlockedUntilUtc = null;
+        private static string _mdbListBlockedMessage = null;
 
         public RatingRefreshTask(ILibraryManager libraryManager, ILogManager logManager, IJsonSerializer jsonSerializer)
         {
@@ -1642,6 +1649,45 @@ namespace RatingSync
             }
         }
 
+        private bool IsMdbListTemporarilyBlocked(out string message)
+        {
+            lock (_mdbListRateLimitLock)
+            {
+                if (_mdbListBlockedUntilUtc.HasValue)
+                {
+                    var now = DateTime.UtcNow;
+                    if (now < _mdbListBlockedUntilUtc.Value)
+                    {
+                        message = string.IsNullOrWhiteSpace(_mdbListBlockedMessage)
+                            ? $"MDBList API limit reached (blocked until {_mdbListBlockedUntilUtc.Value:u})"
+                            : _mdbListBlockedMessage;
+                        return true;
+                    }
+
+                    _mdbListBlockedUntilUtc = null;
+                    _mdbListBlockedMessage = null;
+                }
+            }
+
+            message = null;
+            return false;
+        }
+
+        private void SetMdbListTemporaryBlock(DateTime? blockedUntilUtc, string message)
+        {
+            if (!blockedUntilUtc.HasValue || blockedUntilUtc.Value <= DateTime.UtcNow)
+                return;
+
+            lock (_mdbListRateLimitLock)
+            {
+                if (!_mdbListBlockedUntilUtc.HasValue || blockedUntilUtc.Value > _mdbListBlockedUntilUtc.Value)
+                {
+                    _mdbListBlockedUntilUtc = blockedUntilUtc.Value;
+                    _mdbListBlockedMessage = message;
+                }
+            }
+        }
+
         public async Task Execute(CancellationToken cancellationToken, IProgress<double> progress)
         {
             Log("Starting rating refresh task...", "info");
@@ -1669,10 +1715,16 @@ namespace RatingSync
             {
                 Log($"MDBList: {mdblistRequests}/{config.MdbListDailyLimit} requests used today{(mdblistLimitReached ? " (LIMIT REACHED)" : "")}", mdblistLimitReached ? "warning" : "info");
             }
+
+            var mdbListBlockedByApi = IsMdbListTemporarilyBlocked(out var mdbListBlockMessage);
+            if (mdbListBlockedByApi && !string.IsNullOrWhiteSpace(mdbListBlockMessage))
+            {
+                Log(mdbListBlockMessage, "warning");
+            }
             
             // Check if all APIs are at their limit
             var hasOmdb = !string.IsNullOrEmpty(config.OmdbApiKey) && !omdbLimitReached;
-            var hasMdbList = !string.IsNullOrEmpty(config.MdbListApiKey) && !mdblistLimitReached;
+            var hasMdbList = !string.IsNullOrEmpty(config.MdbListApiKey) && !mdblistLimitReached && !mdbListBlockedByApi;
             
             if (!hasOmdb && !hasMdbList)
             {
@@ -1690,6 +1742,7 @@ namespace RatingSync
             int omdbCalls = 0;
             int mdblistCalls = 0;
             int imdbScrapeCalls = 0;
+                bool mdbListApiRateLimited = false;
             bool wasCancelled = false;
 
             try
@@ -1828,8 +1881,29 @@ namespace RatingSync
                     // Re-check API limits dynamically
                     var currentOmdbLimitReached = config.OmdbRateLimitEnabled && (omdbRequests + omdbCalls) >= config.OmdbDailyLimit;
                     var currentMdbListLimitReached = config.MdbListRateLimitEnabled && (mdblistRequests + mdblistCalls) >= config.MdbListDailyLimit;
+                    var currentMdbListBlockedByApi = IsMdbListTemporarilyBlocked(out var currentMdbListBlockedMessage);
                     var currentHasOmdb = !string.IsNullOrEmpty(config.OmdbApiKey) && !currentOmdbLimitReached;
-                    var currentHasMdbList = !string.IsNullOrEmpty(config.MdbListApiKey) && !currentMdbListLimitReached;
+                    var currentHasMdbList = !string.IsNullOrEmpty(config.MdbListApiKey) && !currentMdbListLimitReached && !mdbListApiRateLimited && !currentMdbListBlockedByApi;
+                    string currentMdbListUnavailableReason = null;
+                    if (!currentHasMdbList)
+                    {
+                        if (string.IsNullOrWhiteSpace(config.MdbListApiKey))
+                        {
+                            currentMdbListUnavailableReason = "MDBList unavailable: no API key configured";
+                        }
+                        else if (currentMdbListBlockedByApi && !string.IsNullOrWhiteSpace(currentMdbListBlockedMessage))
+                        {
+                            currentMdbListUnavailableReason = currentMdbListBlockedMessage;
+                        }
+                        else if (mdbListApiRateLimited)
+                        {
+                            currentMdbListUnavailableReason = "MDBList API limit reached (HTTP 429)";
+                        }
+                        else if (currentMdbListLimitReached && config.MdbListRateLimitEnabled)
+                        {
+                            currentMdbListUnavailableReason = $"MDBList daily limit reached ({mdblistRequests + mdblistCalls}/{config.MdbListDailyLimit})";
+                        }
+                    }
                     
                     if (!currentHasOmdb && !currentHasMdbList)
                     {
@@ -1900,6 +1974,15 @@ namespace RatingSync
                             mdblistCalls++;
                             ScanHistoryManager.IncrementRequestCount("mdblist");
                         }
+                        if (ratings.MdbListRateLimited)
+                        {
+                            mdbListApiRateLimited = true;
+                            SetMdbListTemporaryBlock(ratings.MdbListRateLimitUntilUtc, ratings.MdbListRateLimitMessage);
+                            var limitMsg = string.IsNullOrWhiteSpace(ratings.MdbListRateLimitMessage)
+                                ? "MDBList API limit reached (HTTP 429). Skipping further MDBList requests for this run."
+                                : ratings.MdbListRateLimitMessage;
+                            Log(limitMsg, "warning");
+                        }
                         if (ratings.ImdbScrapeAttempted)
                         {
                             imdbScrapeCalls++;
@@ -1922,7 +2005,7 @@ namespace RatingSync
                         bool itemUpdated = false;
                         var changes = new List<string>();
 
-                        if (ratings.CommunityRating.HasValue)
+                        if (config.UpdateCommunityRating && ratings.CommunityRating.HasValue)
                         {
                             var oldRating = item.CommunityRating;
                             if (oldRating != ratings.CommunityRating.Value)
@@ -1964,24 +2047,71 @@ namespace RatingSync
                             skipped++;
                             // Build detailed skip reason
                             var skipReasons = new List<string>();
+                            if (ratings.MdbListRateLimited)
+                            {
+                                skipReasons.Add(string.IsNullOrWhiteSpace(ratings.MdbListRateLimitMessage)
+                                    ? "MDBList API limit reached (HTTP 429)"
+                                    : ratings.MdbListRateLimitMessage);
+                            }
                             if (!ratings.CommunityRating.HasValue && !ratings.CriticRating.HasValue)
                             {
-                                skipReasons.Add("No ratings found from API");
+                                if (!config.UpdateCommunityRating && !config.UpdateCriticRating)
+                                {
+                                    skipReasons.Add("Community and Critic updates are disabled in settings");
+                                }
+                                else if (!config.UpdateCommunityRating && config.UpdateCriticRating && !ratings.CriticRating.HasValue)
+                                {
+                                    skipReasons.Add("Community updates disabled in settings");
+                                    skipReasons.Add("No RT rating in API");
+                                }
+                                else if (targetSource == CommunityRatingSource.Popcorn && !currentHasMdbList && !string.IsNullOrWhiteSpace(currentMdbListUnavailableReason))
+                                {
+                                    skipReasons.Add(currentMdbListUnavailableReason);
+                                }
+                                else
+                                {
+                                    var noRatingsSourceLabel =
+                                        ratings.UsedOmdb && ratings.UsedMdbList ? "OMDb+MDBList"
+                                        : (ratings.UsedMdbList ? "MDBList"
+                                        : (ratings.UsedOmdb ? "OMDb"
+                                        : (targetSource == CommunityRatingSource.Popcorn ? "MDBList" : "API")));
+                                    skipReasons.Add($"No ratings found from API [{noRatingsSourceLabel}]");
+                                }
                             }
                             else
                             {
                                 var communityLogName = targetSource == CommunityRatingSource.Popcorn ? "Popcorn" : "IMDb";
-                                if (ratings.CommunityRating.HasValue && item.CommunityRating == ratings.CommunityRating.Value)
+                                if (config.UpdateCommunityRating && ratings.CommunityRating.HasValue && item.CommunityRating == ratings.CommunityRating.Value)
                                 {
                                     skipReasons.Add($"{communityLogName} unchanged ({item.CommunityRating:F1})");
                                 }
+                                if (!config.UpdateCommunityRating)
+                                {
+                                    skipReasons.Add("Community updates disabled in settings");
+                                }
                                 if (config.UpdateCriticRating && ratings.CriticRating.HasValue && item.CriticRating == ratings.CriticRating.Value)
                                 {
-                                    skipReasons.Add($"RT unchanged ({item.CriticRating:F0}%)");
+                                    var rtUnchangedSource = ratings.UsedMdbList ? "MDBList" : (ratings.UsedOmdb ? "OMDb" : "API");
+                                    skipReasons.Add($"RT unchanged ({item.CriticRating:F0}%) [{rtUnchangedSource}]");
                                 }
-                                if (!ratings.CommunityRating.HasValue)
+                                if (config.UpdateCommunityRating && !ratings.CommunityRating.HasValue)
                                 {
-                                    skipReasons.Add($"No {communityLogName} rating in API");
+                                    if (targetSource == CommunityRatingSource.Popcorn && !currentHasMdbList)
+                                    {
+                                        if (!string.IsNullOrWhiteSpace(currentMdbListUnavailableReason))
+                                            skipReasons.Add(currentMdbListUnavailableReason);
+                                        else
+                                            skipReasons.Add($"No {communityLogName} rating in API [MDBList]");
+                                    }
+                                    else
+                                    {
+                                        var communitySourceLabel =
+                                            targetSource == CommunityRatingSource.Popcorn ? "MDBList"
+                                            : (ratings.UsedOmdb && ratings.UsedMdbList ? "OMDb+MDBList"
+                                            : (ratings.UsedOmdb ? "OMDb"
+                                            : (ratings.UsedMdbList ? "MDBList" : "API")));
+                                        skipReasons.Add($"No {communityLogName} rating in API [{communitySourceLabel}]");
+                                    }
                                 }
                                 if (config.UpdateCriticRating && !ratings.CriticRating.HasValue)
                                 {
@@ -2170,13 +2300,19 @@ namespace RatingSync
                     // Fallback to MDBList if missing community rating OR missing critic rating (when critic updates enabled)
                     var needsMdbFallback = !result.CommunityRating.HasValue || 
                                            (config.UpdateCriticRating && !result.CriticRating.HasValue);
-                    if (needsMdbFallback && canUseMdbList && !string.IsNullOrEmpty(config.MdbListApiKey))
+                    if (config.AllowAlternateSourceFallback && needsMdbFallback && canUseMdbList && !string.IsNullOrEmpty(config.MdbListApiKey))
                     {
                         var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, targetSource, episodeInfo);
                         if (!result.CommunityRating.HasValue && mdbData.CommunityRating.HasValue)
                             result.CommunityRating = mdbData.CommunityRating;
                         if (!result.CriticRating.HasValue && mdbData.CriticRating.HasValue)
                             result.CriticRating = mdbData.CriticRating;
+                        if (mdbData.MdbListRateLimited)
+                        {
+                            result.MdbListRateLimited = true;
+                            result.MdbListRateLimitMessage = mdbData.MdbListRateLimitMessage;
+                            result.MdbListRateLimitUntilUtc = mdbData.MdbListRateLimitUntilUtc;
+                        }
                         result.UsedMdbList = true;
                     }
                     break;
@@ -2187,13 +2323,19 @@ namespace RatingSync
                         var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, targetSource, episodeInfo);
                         result.CommunityRating = mdbData.CommunityRating;
                         result.CriticRating = mdbData.CriticRating;
+                        if (mdbData.MdbListRateLimited)
+                        {
+                            result.MdbListRateLimited = true;
+                            result.MdbListRateLimitMessage = mdbData.MdbListRateLimitMessage;
+                            result.MdbListRateLimitUntilUtc = mdbData.MdbListRateLimitUntilUtc;
+                        }
                         result.UsedMdbList = true;
                     }
                     
                     // Fallback to OMDb if missing community rating OR missing critic rating (when critic updates enabled)
                     var needsOmdbFallback = !result.CommunityRating.HasValue || 
                                             (config.UpdateCriticRating && !result.CriticRating.HasValue);
-                    if (needsOmdbFallback && canUseOmdb && !string.IsNullOrEmpty(config.OmdbApiKey))
+                    if (config.AllowAlternateSourceFallback && needsOmdbFallback && canUseOmdb && !string.IsNullOrEmpty(config.OmdbApiKey))
                     {
                         var omdbData = await FetchFromOmdb(imdbId, config.OmdbApiKey, targetSource, episodeInfo);
                         if (!result.CommunityRating.HasValue && omdbData.CommunityRating.HasValue)
@@ -2222,6 +2364,12 @@ namespace RatingSync
                             result.CommunityRating = mdbData.CommunityRating;
                         if (!result.CriticRating.HasValue && mdbData.CriticRating.HasValue)
                             result.CriticRating = mdbData.CriticRating;
+                        if (mdbData.MdbListRateLimited)
+                        {
+                            result.MdbListRateLimited = true;
+                            result.MdbListRateLimitMessage = mdbData.MdbListRateLimitMessage;
+                            result.MdbListRateLimitUntilUtc = mdbData.MdbListRateLimitUntilUtc;
+                        }
                         result.UsedMdbList = true;
                     }
                     break;
@@ -2359,6 +2507,14 @@ namespace RatingSync
                     {
                         response = await client.GetAsync(url);
                         responseBody = await response.Content.ReadAsStringAsync();
+
+                        if ((int)response.StatusCode == 429)
+                        {
+                            result.MdbListRateLimited = true;
+                            result.MdbListRateLimitUntilUtc = GetMdbListRetryAfterUtc(response);
+                            result.MdbListRateLimitMessage = BuildMdbListRateLimitMessage(response);
+                            return result;
+                        }
                         
                         // If show lookup fails or returns no data, try as movie
                         if (!response.IsSuccessStatusCode || string.IsNullOrEmpty(responseBody) || responseBody.Contains("\"ratings\":null"))
@@ -2366,6 +2522,14 @@ namespace RatingSync
                             url = $"https://api.mdblist.com/imdb/movie/{imdbId}?apikey={apiKey}";
                             response = await client.GetAsync(url);
                             responseBody = await response.Content.ReadAsStringAsync();
+
+                            if ((int)response.StatusCode == 429)
+                            {
+                                result.MdbListRateLimited = true;
+                                result.MdbListRateLimitUntilUtc = GetMdbListRetryAfterUtc(response);
+                                result.MdbListRateLimitMessage = BuildMdbListRateLimitMessage(response);
+                                return result;
+                            }
                         }
                     }
                     catch (HttpRequestException)
@@ -2425,6 +2589,61 @@ namespace RatingSync
             }
 
             return result;
+        }
+
+        private string BuildMdbListRateLimitMessage(HttpResponseMessage response)
+        {
+            var retryUntilUtc = GetMdbListRetryAfterUtc(response);
+            if (retryUntilUtc.HasValue)
+            {
+                return $"MDBList API limit reached (HTTP 429, blocked until {retryUntilUtc.Value:u})";
+            }
+
+            try
+            {
+                var retryAfter = response?.Headers?.RetryAfter;
+                if (retryAfter != null)
+                {
+                    if (retryAfter.Delta.HasValue && retryAfter.Delta.Value.TotalSeconds > 0)
+                    {
+                        var totalSeconds = (int)Math.Ceiling(retryAfter.Delta.Value.TotalSeconds);
+                        return $"MDBList API limit reached (HTTP 429, retry after {totalSeconds}s)";
+                    }
+                    if (retryAfter.Date.HasValue)
+                    {
+                        var utc = retryAfter.Date.Value.UtcDateTime.ToString("u");
+                        return $"MDBList API limit reached (HTTP 429, retry at {utc})";
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore header parsing issues.
+            }
+
+            return "MDBList API limit reached (HTTP 429)";
+        }
+
+        private DateTime? GetMdbListRetryAfterUtc(HttpResponseMessage response)
+        {
+            try
+            {
+                var retryAfter = response?.Headers?.RetryAfter;
+                if (retryAfter == null)
+                    return null;
+
+                if (retryAfter.Delta.HasValue && retryAfter.Delta.Value.TotalSeconds > 0)
+                    return DateTime.UtcNow.Add(retryAfter.Delta.Value);
+
+                if (retryAfter.Date.HasValue)
+                    return retryAfter.Date.Value.UtcDateTime;
+            }
+            catch
+            {
+                // Ignore header parsing issues.
+            }
+
+            return null;
         }
 
         // Fetch the IMDb rating for any title (episode, movie, series) via api.imdbapi.dev.
@@ -2730,6 +2949,9 @@ namespace RatingSync
             public bool UsedMdbList { get; set; }
             public bool UsedScraping { get; set; }
             public bool ImdbScrapeAttempted { get; set; }
+            public bool MdbListRateLimited { get; set; }
+            public string MdbListRateLimitMessage { get; set; }
+            public DateTime? MdbListRateLimitUntilUtc { get; set; }
         }
 
         private class OmdbResponse

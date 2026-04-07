@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.0.6] - 2026-04-07
+
+- Feature: Added `Update Community Rating` toggle so community and critic updates can be controlled independently.
+- Improvement: Run tab now reports source-aware "no ratings found" and clearer messages when MDBList is unavailable due to daily/API limits.
+
+## [1.0.5] - 2026-04-07
+
+- Feature: Added `Allow fallback to alternate API source` toggle for strict preferred-source mode.
+- Improvement: Episodes Community Rating is now forced to IMDb in UI and runtime logic.
+- Improvement: Run tab skip reasons now include API source labels (e.g., `[OMDb]`, `[MDBList]`) and clearer MDBList-unavailable messaging.
+- Fix: Handle MDBList 429 responses with retry-until tracking and temporary API cooldown.
+
+## [1.0.4] - 2026-04-07
+
+- Fix: README.md formatting error in the header.
+- Improvement: Cleaned up MDBList rating search logic in Plugin.cs.
+
 ## [1.0.3] - 2026-04-07
 
 - Feature: Allow configuring the Community Rating source per media type (Movies, TV Series, Episodes).
