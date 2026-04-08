@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.0.9] - 2026-04-08
+
+- Fix: Resolved `ReferenceError` in `saveConfig` where the `self` variable was undefined.
+- Fix: Added robust element checks to the settings page to prevent crashes and improved error logging for configuration loading/saving.
+- Fix: Restricted "Enable IMDb Scraping (Episode Fallback)" to strictly target episodes only, removing unintended fallback for movies and series.
+- Fix: Corrected manual library refreshes (Start Refresh) to respect the "Update Movies", "Update Series", and "Update Episodes" checkboxes.
+- Fix: Additional UI cache-bust by bumping versioned plugin page names.
+
+## [1.0.8] - 2026-04-07
+
+- Fix: Force configuration page cache-bust by versioning plugin web page names to ensure latest UI loads after updates.
+
+## [1.0.7] - 2026-04-07
+
+- Feature: Simplified settings with a single `API Mode` selector (`OMDb only`, `MDBList only`, fallback modes, `Both`).
+- Feature: Simplified Community Rating source to one selector for movies/series (`IMDb` or `Popcorn`), with episodes fixed to IMDb.
+- Improvement: Removed overlapping per-type source controls and legacy fallback checkbox from the UI to reduce confusion.
+
 ## [1.0.6] - 2026-04-07
 
 - Feature: Added `Update Community Rating` toggle so community and critic updates can be controlled independently.

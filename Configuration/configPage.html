@@ -1,5 +1,5 @@
 <div is="emby-scroller"
-    data-controller="configurationpage?name=RatingSyncConfigurationjs"
+    data-controller="configurationpage?name=RatingSyncConfigurationjs_v109"
     class="view flex flex-direction-column scrollFrameY flex-grow"
     data-horizontal="false"
     data-forcescrollbar="true"
@@ -263,63 +263,48 @@
                     <div class="verticalSection">
                         <h2 class="sectionTitle">Rating Options</h2>
 
+                        <h3 class="sectionTitle" style="font-size: 1.05em; margin-top: 0.25em;">Critic Ratings (Tomatometer)</h3>
+
                         <div class="selectContainer">
-                            <label class="selectLabel" for="selectPreferredSource">Preferred Rating Source</label>
-                            <select id="selectPreferredSource" is="emby-select">
-                                <option value="OMDb">OMDb</option>
-                                <option value="MDBList">MDBList</option>
-                                <option value="Both">Both (query simultaneously)</option>
+                            <label class="selectLabel" for="selectApiMode">API Mode</label>
+                            <select id="selectApiMode" is="emby-select">
+                                <option value="OMDbOnly">OMDb only</option>
+                                <option value="MDBListOnly">MDBList only</option>
+                                <option value="OMDbWithMDBListFallback">OMDb with MDBList fallback</option>
+                                <option value="MDBListWithOMDbFallback">MDBList with OMDb fallback</option>
+                                <option value="Both">Both</option>
                             </select>
-                            <div class="fieldDescription">Choose which source to prioritize for ratings.</div>
+                            <div class="fieldDescription">Choose how critic/community API data is fetched. In fallback modes, the plugin tries the other API if data is missing or unavailable.</div>
                         </div>
-
-                        <label class="checkboxContainer">
-                            <input type="checkbox" is="emby-checkbox" id="chkAllowAlternateSourceFallback" />
-                            <span>Allow fallback to alternate API source</span>
-                        </label>
-                        <div class="fieldDescription" style="margin-bottom: 1.2em;">When enabled, missing ratings can be filled by the other API (OMDb or MDBList). Disable for strict source-only mode.</div>
-
-                        <label class="checkboxContainer">
-                            <input type="checkbox" is="emby-checkbox" id="chkUpdateCommunityRating" />
-                            <span>Update Community Rating</span>
-                        </label>
-                        <div class="fieldDescription" style="margin-bottom: 0.8em;">When enabled, updates Emby's Community Rating using your per-type source settings.</div>
 
                         <label class="checkboxContainer">
                             <input type="checkbox" is="emby-checkbox" id="chkUpdateCriticRating" />
-                            <span>Update Critic Rating (Rotten Tomatoes)</span>
+                            <span>Enable Critic Ratings (Tomatometer)</span>
                         </label>
-                        <div class="fieldDescription" style="margin-bottom: 2em;">When enabled, also updates the critic rating with Rotten Tomatoes scores.</div>
+                        <div class="fieldDescription" style="margin-bottom: 1.2em;">Updates Emby's Critic Rating using Rotten Tomatoes critic scores where available.</div>
 
-                        <h3 class="sectionTitle" style="font-size: 1.1em;">Community Rating Source</h3>
-                        <div class="fieldDescription" style="margin-bottom: 1em;">Choose what Emby's Community Rating maps to for each media type. Note: Popcorn (RT Audience) ratings require MDBList API.</div>
+                        <h3 class="sectionTitle" style="font-size: 1.05em;">Community Ratings</h3>
 
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5em; margin-bottom: 1.5em;">
-                            <div class="selectContainer" style="margin-bottom: 0;">
-                                <label class="selectLabel" for="selectMoviesRatingSource">Movies</label>
-                                <select id="selectMoviesRatingSource" is="emby-select">
-                                    <option value="IMDb">IMDb</option>
-                                    <option value="Popcorn">Rotten Tomatoes Audience (Popcorn)</option>
-                                </select>
-                            </div>
-                            
-                            <div class="selectContainer" style="margin-bottom: 0;">
-                                <label class="selectLabel" for="selectSeriesRatingSource">TV Series</label>
-                                <select id="selectSeriesRatingSource" is="emby-select">
-                                    <option value="IMDb">IMDb</option>
-                                    <option value="Popcorn">Rotten Tomatoes Audience (Popcorn)</option>
-                                </select>
-                            </div>
+                        <label class="checkboxContainer">
+                            <input type="checkbox" is="emby-checkbox" id="chkUpdateCommunityRating" />
+                            <span>Enable Community Ratings</span>
+                        </label>
+                        <div class="fieldDescription" style="margin-bottom: 0.8em;">Updates Emby's Community Rating for movies/series based on the selected metric below.</div>
 
-                            <div class="selectContainer" style="margin-bottom: 0;">
-                                <label class="selectLabel" for="selectEpisodesRatingSource">Episodes</label>
-                                <select id="selectEpisodesRatingSource" is="emby-select">
-                                    <option value="IMDb">IMDb</option>
-                                </select>
-                            </div>
+                        <div class="selectContainer" style="margin-bottom: 1.5em;">
+                            <label class="selectLabel" for="selectCommunityRatingSource">Community Metric (Movies & TV Series)</label>
+                            <select id="selectCommunityRatingSource" is="emby-select">
+                                <option value="IMDb">IMDb</option>
+                                <option value="Popcorn">Rotten Tomatoes Audience (Popcorn)</option>
+                            </select>
+                            <div class="fieldDescription">IMDb uses IMDb community score. Popcorn uses Rotten Tomatoes Audience score.</div>
+                            <div class="fieldDescription" id="communitySourceCompatMessage" style="margin-top: 0.4em; display: none;">Popcorn requires MDBList. API Mode was adjusted to include MDBList.</div>
                         </div>
                         <div class="infoBox">
-                            <strong>Note:</strong> Episodes are always mapped to <em>IMDb</em> for Community Rating. MDBList does not currently support episode-level lookups for Popcorn.
+                            <strong>Helpful notes:</strong>
+                            Episodes always use <em>IMDb</em> for Community Rating.
+                            Popcorn requires MDBList (OMDb-only mode is not compatible).
+                            If an API is limited/unavailable, Run tab results show source-aware reasons.
                         </div>
                     </div>
 

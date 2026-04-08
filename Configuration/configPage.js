@@ -465,121 +465,255 @@ function (BaseView, loading, toast) {
             }
         }
 
+        getMdbListCompatibleApiMode(currentMode) {
+            if (currentMode === 'MDBListOnly' ||
+                currentMode === 'MDBListWithOMDbFallback' ||
+                currentMode === 'OMDbWithMDBListFallback' ||
+                currentMode === 'Both') {
+                return currentMode;
+            }
+            return 'MDBListWithOMDbFallback';
+        }
+
+        enforceCommunityApiCompatibility(view, options) {
+            var opts = options || {};
+            var selectApiMode = view.querySelector('#selectApiMode');
+            var selectCommunity = view.querySelector('#selectCommunityRatingSource');
+            var compatMsg = view.querySelector('#communitySourceCompatMessage');
+            if (!selectApiMode || !selectCommunity) return;
+
+            if (selectCommunity.value === 'Popcorn') {
+                // OMDb-only cannot provide Popcorn; automatically pick a MDBList-capable mode.
+                var normalized = this.getMdbListCompatibleApiMode(selectApiMode.value);
+                var changed = normalized !== selectApiMode.value;
+                if (changed) {
+                    selectApiMode.value = normalized;
+                }
+                if (compatMsg) {
+                    compatMsg.style.display = 'block';
+                    compatMsg.textContent = changed
+                        ? 'Popcorn requires MDBList. API Mode was adjusted to include MDBList.'
+                        : 'Popcorn requires MDBList-compatible API Mode.';
+                }
+                if (changed && opts.notify) {
+                    toast({ text: 'Popcorn requires MDBList. API Mode was updated.' });
+                }
+            } else if (compatMsg) {
+                compatMsg.style.display = 'none';
+            }
+        }
+
         loadConfig(view) {
+            var self = this;
             loading.show();
 
             ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-                view.querySelector('#txtOmdbApiKey').value = config.OmdbApiKey || '';
-                view.querySelector('#txtMdbListApiKey').value = config.MdbListApiKey || '';
-                
-                var sourceValue = config.PreferredSource;
-                if (typeof sourceValue === 'number') {
-                    var sourceMap = ['OMDb', 'MDBList', 'Both'];
-                    sourceValue = sourceMap[sourceValue] || 'OMDb';
+                if (!config) {
+                    console.error('RatingSync: getPluginConfiguration returned null');
+                    loading.hide();
+                    return;
                 }
-                view.querySelector('#selectPreferredSource').value = sourceValue || 'OMDb';
+
+                var omdbInput = view.querySelector('#txtOmdbApiKey');
+                var mdbInput = view.querySelector('#txtMdbListApiKey');
+                if (omdbInput) omdbInput.value = config.OmdbApiKey || '';
+                if (mdbInput) mdbInput.value = config.MdbListApiKey || '';
+                
+                var apiModeValue = config.ApiMode;
+                if (typeof apiModeValue === 'number') {
+                    var apiModeMap = ['OMDbOnly', 'MDBListOnly', 'OMDbWithMDBListFallback', 'MDBListWithOMDbFallback', 'Both'];
+                    apiModeValue = apiModeMap[apiModeValue];
+                }
+                if (!apiModeValue) {
+                    // Backwards compatibility with previous PreferredSource + fallback config.
+                    var source = config.PreferredSource;
+                    var fallback = config.AllowAlternateSourceFallback !== false;
+                    var sourceLabel = source;
+                    if (typeof sourceLabel === 'number') {
+                        var oldSourceMap = ['OMDb', 'MDBList', 'Both'];
+                        sourceLabel = oldSourceMap[sourceLabel] || 'OMDb';
+                    }
+                    if (sourceLabel === 'Both') apiModeValue = 'Both';
+                    else if (sourceLabel === 'MDBList') apiModeValue = fallback ? 'MDBListWithOMDbFallback' : 'MDBListOnly';
+                    else apiModeValue = fallback ? 'OMDbWithMDBListFallback' : 'OMDbOnly';
+                }
+                var selectApiMode = view.querySelector('#selectApiMode');
+                if (selectApiMode) selectApiMode.value = apiModeValue || 'OMDbWithMDBListFallback';
                 
                 var communitySourceMapArray = ['IMDb', 'Popcorn'];
-                
-                var moviesRatingValue = config.MoviesRatingSource;
-                if (typeof moviesRatingValue === 'number') moviesRatingValue = communitySourceMapArray[moviesRatingValue];
-                view.querySelector('#selectMoviesRatingSource').value = moviesRatingValue || 'IMDb';
+                var communityValue = config.CommunityRatingSource;
+                if (typeof communityValue === 'number') communityValue = communitySourceMapArray[communityValue];
+                if (!communityValue) {
+                    // Backwards compatibility with per-type settings.
+                    var moviesRatingValue = config.MoviesRatingSource;
+                    if (typeof moviesRatingValue === 'number') moviesRatingValue = communitySourceMapArray[moviesRatingValue];
+                    communityValue = moviesRatingValue || 'IMDb';
+                }
+                var selectCommunity = view.querySelector('#selectCommunityRatingSource');
+                if (selectCommunity) selectCommunity.value = communityValue || 'IMDb';
 
-                var seriesRatingValue = config.SeriesRatingSource;
-                if (typeof seriesRatingValue === 'number') seriesRatingValue = communitySourceMapArray[seriesRatingValue];
-                view.querySelector('#selectSeriesRatingSource').value = seriesRatingValue || 'IMDb';
+                var setChecked = function(id, val) {
+                    var el = view.querySelector(id);
+                    if (el) el.checked = val;
+                };
 
-                var episodesRatingValue = config.EpisodesRatingSource;
-                if (typeof episodesRatingValue === 'number') episodesRatingValue = communitySourceMapArray[episodesRatingValue];
-                view.querySelector('#selectEpisodesRatingSource').value = 'IMDb';
-
-                
-                view.querySelector('#chkUpdateCommunityRating').checked = config.UpdateCommunityRating !== false;
-                view.querySelector('#chkUpdateCriticRating').checked = config.UpdateCriticRating !== false;
-                view.querySelector('#chkAllowAlternateSourceFallback').checked = config.AllowAlternateSourceFallback !== false;
-                view.querySelector('#chkUpdateMovies').checked = config.UpdateMovies !== false;
-                view.querySelector('#chkUpdateSeries').checked = config.UpdateSeries !== false;
-                view.querySelector('#chkUpdateEpisodes').checked = config.UpdateEpisodes === true;
-                view.querySelector('#chkEnableImdbScraping').checked = config.EnableImdbScraping === true;
+                setChecked('#chkUpdateCommunityRating', config.UpdateCommunityRating !== false);
+                setChecked('#chkUpdateCriticRating', config.UpdateCriticRating !== false);
+                setChecked('#chkUpdateMovies', config.UpdateMovies !== false);
+                setChecked('#chkUpdateSeries', config.UpdateSeries !== false);
+                setChecked('#chkUpdateEpisodes', config.UpdateEpisodes === true);
+                setChecked('#chkEnableImdbScraping', config.EnableImdbScraping === true);
                 
                 // API Rate Limiting settings
                 var omdbRateLimit = config.OmdbRateLimitEnabled === true;
                 var mdblistRateLimit = config.MdbListRateLimitEnabled === true;
-                view.querySelector('#chkOmdbRateLimit').checked = omdbRateLimit;
-                view.querySelector('#txtOmdbDailyLimit').value = config.OmdbDailyLimit || 1000;
-                view.querySelector('#omdbLimitOptions').style.display = omdbRateLimit ? 'block' : 'none';
-                view.querySelector('#chkMdbListRateLimit').checked = mdblistRateLimit;
-                view.querySelector('#txtMdbListDailyLimit').value = config.MdbListDailyLimit || 1000;
-                view.querySelector('#mdblistLimitOptions').style.display = mdblistRateLimit ? 'block' : 'none';
+                setChecked('#chkOmdbRateLimit', omdbRateLimit);
+                
+                var omdbLimitInput = view.querySelector('#txtOmdbDailyLimit');
+                if (omdbLimitInput) omdbLimitInput.value = config.OmdbDailyLimit || 1000;
+                
+                var omdbLimitOptions = view.querySelector('#omdbLimitOptions');
+                if (omdbLimitOptions) omdbLimitOptions.style.display = omdbRateLimit ? 'block' : 'none';
+                
+                setChecked('#chkMdbListRateLimit', mdblistRateLimit);
+                
+                var mdbLimitInput = view.querySelector('#txtMdbListDailyLimit');
+                if (mdbLimitInput) mdbLimitInput.value = config.MdbListDailyLimit || 1000;
+                
+                var mdbLimitOptions = view.querySelector('#mdblistLimitOptions');
+                if (mdbLimitOptions) mdbLimitOptions.style.display = mdblistRateLimit ? 'block' : 'none';
                 
                 // Smart scanning settings
-                view.querySelector('#txtRescanInterval').value = config.RescanIntervalDays || 30;
-                view.querySelector('#chkPrioritizeRecent').checked = config.PrioritizeRecentlyAdded !== false;
-                view.querySelector('#txtRecentDays').value = config.RecentlyAddedDays || 7;
-                view.querySelector('#chkSkipUnratedOnly').checked = config.SkipUnratedOnly === true;
+                var rescanInput = view.querySelector('#txtRescanInterval');
+                if (rescanInput) rescanInput.value = config.RescanIntervalDays || 30;
                 
-                view.querySelector('#chkTestMode').checked = config.TestMode === true;
+                setChecked('#chkPrioritizeRecent', config.PrioritizeRecentlyAdded !== false);
+                
+                var recentDaysInput = view.querySelector('#txtRecentDays');
+                if (recentDaysInput) recentDaysInput.value = config.RecentlyAddedDays || 7;
+                
+                setChecked('#chkSkipUnratedOnly', config.SkipUnratedOnly === true);
+                setChecked('#chkTestMode', config.TestMode === true);
 
+                self.enforceCommunityApiCompatibility(view, { notify: false });
                 loading.hide();
             }).catch(function (err) {
-                console.error('Error loading config:', err);
+                console.error('RatingSync: Error loading config:', err);
                 loading.hide();
-                toast({ text: 'Error loading configuration' });
+                toast({ text: 'Error loading configuration. See browser console for details.' });
             });
         }
 
         saveConfig(view) {
+            var self = this;
             loading.show();
 
             ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-                config.OmdbApiKey = view.querySelector('#txtOmdbApiKey').value;
-                config.MdbListApiKey = view.querySelector('#txtMdbListApiKey').value;
+                if (!config) {
+                    console.error('RatingSync: getPluginConfiguration returned null during save');
+                    loading.hide();
+                    return;
+                }
+
+                var getValue = function(id) {
+                    var el = view.querySelector(id);
+                    return el ? el.value : '';
+                };
+
+                var getChecked = function(id) {
+                    var el = view.querySelector(id);
+                    return el ? el.checked : false;
+                };
+
+                config.OmdbApiKey = getValue('#txtOmdbApiKey');
+                config.MdbListApiKey = getValue('#txtMdbListApiKey');
                 
-                // Convert string value to enum number for backend
-                var sourceStr = view.querySelector('#selectPreferredSource').value;
-                var sourceMap = { 'OMDb': 0, 'MDBList': 1, 'Both': 2 };
-                config.PreferredSource = sourceMap[sourceStr] !== undefined ? sourceMap[sourceStr] : 0;
-                
+                // Simplified API mode.
+                var apiModeStr = getValue('#selectApiMode');
+                var apiModeMap = {
+                    'OMDbOnly': 0,
+                    'MDBListOnly': 1,
+                    'OMDbWithMDBListFallback': 2,
+                    'MDBListWithOMDbFallback': 3,
+                    'Both': 4
+                };
+                config.ApiMode = apiModeMap[apiModeStr] !== undefined ? apiModeMap[apiModeStr] : 2;
+
+                // Keep legacy fields in sync for backwards compatibility.
+                switch (apiModeStr) {
+                    case 'OMDbOnly':
+                        config.PreferredSource = 0; // OMDb
+                        config.AllowAlternateSourceFallback = false;
+                        break;
+                    case 'MDBListOnly':
+                        config.PreferredSource = 1; // MDBList
+                        config.AllowAlternateSourceFallback = false;
+                        break;
+                    case 'MDBListWithOMDbFallback':
+                        config.PreferredSource = 1; // MDBList
+                        config.AllowAlternateSourceFallback = true;
+                        break;
+                    case 'Both':
+                        config.PreferredSource = 2; // Both
+                        config.AllowAlternateSourceFallback = true;
+                        break;
+                    case 'OMDbWithMDBListFallback':
+                    default:
+                        config.PreferredSource = 0; // OMDb
+                        config.AllowAlternateSourceFallback = true;
+                        break;
+                }
+
                 var communitySourceMap = { 'IMDb': 0, 'Popcorn': 1 };
-                config.MoviesRatingSource = communitySourceMap[view.querySelector('#selectMoviesRatingSource').value] || 0;
-                config.SeriesRatingSource = communitySourceMap[view.querySelector('#selectSeriesRatingSource').value] || 0;
-                // Episodes are always IMDb because MDBList has no episode Popcorn data.
+                var communitySource = communitySourceMap[getValue('#selectCommunityRatingSource')] || 0;
+                if (communitySource === 1) {
+                    var compatibleMode = self.getMdbListCompatibleApiMode(apiModeStr);
+                    if (compatibleMode !== apiModeStr) {
+                        apiModeStr = compatibleMode;
+                        config.ApiMode = apiModeMap[apiModeStr];
+                        config.PreferredSource = 1; // MDBList
+                        config.AllowAlternateSourceFallback = true;
+                    }
+                }
+                config.CommunityRatingSource = communitySource;
+                // Keep legacy per-type fields in sync for backwards compatibility.
+                config.MoviesRatingSource = communitySource;
+                config.SeriesRatingSource = communitySource;
                 config.EpisodesRatingSource = 0;
                 
-                config.UpdateCommunityRating = view.querySelector('#chkUpdateCommunityRating').checked;
-                config.UpdateCriticRating = view.querySelector('#chkUpdateCriticRating').checked;
-                config.AllowAlternateSourceFallback = view.querySelector('#chkAllowAlternateSourceFallback').checked;
-                config.UpdateMovies = view.querySelector('#chkUpdateMovies').checked;
-                config.UpdateSeries = view.querySelector('#chkUpdateSeries').checked;
-                config.UpdateEpisodes = view.querySelector('#chkUpdateEpisodes').checked;
-                config.EnableImdbScraping = view.querySelector('#chkEnableImdbScraping').checked;
+                config.UpdateCommunityRating = getChecked('#chkUpdateCommunityRating');
+                config.UpdateCriticRating = getChecked('#chkUpdateCriticRating');
+                config.UpdateMovies = getChecked('#chkUpdateMovies');
+                config.UpdateSeries = getChecked('#chkUpdateSeries');
+                config.UpdateEpisodes = getChecked('#chkUpdateEpisodes');
+                config.EnableImdbScraping = getChecked('#chkEnableImdbScraping');
                 
                 // API Rate Limiting settings
-                config.OmdbRateLimitEnabled = view.querySelector('#chkOmdbRateLimit').checked;
-                config.OmdbDailyLimit = parseInt(view.querySelector('#txtOmdbDailyLimit').value, 10) || 1000;
-                config.MdbListRateLimitEnabled = view.querySelector('#chkMdbListRateLimit').checked;
-                config.MdbListDailyLimit = parseInt(view.querySelector('#txtMdbListDailyLimit').value, 10) || 1000;
+                config.OmdbRateLimitEnabled = getChecked('#chkOmdbRateLimit');
+                config.OmdbDailyLimit = parseInt(getValue('#txtOmdbDailyLimit'), 10) || 1000;
+                config.MdbListRateLimitEnabled = getChecked('#chkMdbListRateLimit');
+                config.MdbListDailyLimit = parseInt(getValue('#txtMdbListDailyLimit'), 10) || 1000;
                 
                 // Smart scanning settings
-                config.RescanIntervalDays = parseInt(view.querySelector('#txtRescanInterval').value, 10) || 30;
-                config.PrioritizeRecentlyAdded = view.querySelector('#chkPrioritizeRecent').checked;
-                config.RecentlyAddedDays = parseInt(view.querySelector('#txtRecentDays').value, 10) || 7;
-                config.SkipUnratedOnly = view.querySelector('#chkSkipUnratedOnly').checked;
+                config.RescanIntervalDays = parseInt(getValue('#txtRescanInterval'), 10) || 30;
+                config.PrioritizeRecentlyAdded = getChecked('#chkPrioritizeRecent');
+                config.RecentlyAddedDays = parseInt(getValue('#txtRecentDays'), 10) || 7;
+                config.SkipUnratedOnly = getChecked('#chkSkipUnratedOnly');
                 
-                config.TestMode = view.querySelector('#chkTestMode').checked;
+                config.TestMode = getChecked('#chkTestMode');
 
                 ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
                     loading.hide();
                     toast({ text: 'Settings saved successfully!' });
                 }).catch(function (err) {
-                    console.error('Error saving config:', err);
+                    console.error('RatingSync: Error updating config:', err);
                     loading.hide();
-                    toast({ text: 'Error saving configuration' });
+                    toast({ text: 'Error saving configuration. See browser console for details.' });
                 });
             }).catch(function (err) {
-                console.error('Error getting config:', err);
+                console.error('RatingSync: Error getting config during save:', err);
                 loading.hide();
-                toast({ text: 'Error saving configuration' });
+                toast({ text: 'Error saving configuration. See browser console for details.' });
             });
         }
 
@@ -1048,6 +1182,19 @@ function (BaseView, loading, toast) {
 
             // Load configuration
             self.loadConfig(view);
+
+            var selectApiMode = view.querySelector('#selectApiMode');
+            if (selectApiMode) {
+                selectApiMode.addEventListener('change', function() {
+                    self.enforceCommunityApiCompatibility(view, { notify: false });
+                });
+            }
+            var selectCommunityRatingSource = view.querySelector('#selectCommunityRatingSource');
+            if (selectCommunityRatingSource) {
+                selectCommunityRatingSource.addEventListener('change', function() {
+                    self.enforceCommunityApiCompatibility(view, { notify: true });
+                });
+            }
 
             // Load API counters
             self.updateApiCounters(view);
