@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.0.10.1] - 2026-05-26
+
+- Fix: IMDb scraping rate limit now properly enforced - prevents scraping when daily limit is reached and stops at the configured limit during batch processing.
+
+## [1.0.10] - 2026-05-26
+
+- Feature: Added IMDb scraping daily rate limit setting to control how many IMDb API requests are made per day.
+
 ## [1.0.9] - 2026-04-08
 
 - Fix: Resolved `ReferenceError` in `saveConfig` where the `self` variable was undefined.

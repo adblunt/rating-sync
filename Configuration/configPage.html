@@ -332,13 +332,20 @@
                         
                         <label class="checkboxContainer" style="margin-top: 1em;">
                             <input type="checkbox" is="emby-checkbox" id="chkEnableImdbScraping" />
-                                    <label style="display:block;margin-top:0.5em">IMDb scraping rate limit</label>
-                                    <label style="display:flex;gap:0.75em;align-items:center;margin-top:0.35em"><input type="checkbox" is="emby-checkbox" id="chkImdbRateLimit" /> Enable daily limit</label>
-                                    <div id="imdbLimitOptions" style="margin-top:0.5em">
-                                        <input type="number" id="txtImdbDailyLimit" style="width:8em;padding:0.45em;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.9)" />
-                                    </div>
                             <span>Enable IMDb Scraping (Episode Fallback)</span>
                         </label>
+
+                        <div style="margin-left: 1.25em; margin-top: 0.5em;">
+                            <label class="checkboxContainer">
+                                <input type="checkbox" is="emby-checkbox" id="chkImdbRateLimit" />
+                                <span>Enable daily limit</span>
+                            </label>
+                            <div class="inputContainer" id="imdbLimitOptions" style="margin-top: 0.5em;">
+                                <label class="inputLabel inputLabelUnfocused" for="txtImdbDailyLimit">Daily Limit</label>
+                                <input id="txtImdbDailyLimit" type="number" is="emby-input" min="100" max="100000" />
+                                <div class="fieldDescription">Free tier: 1,000/day</div>
+                            </div>
+                        </div>
                         <div class="noteBox" style="margin-top: 0.5em;">
                             <strong>⚠️ Warning:</strong> When OMDb doesn't have an episode rating, this will scrape IMDb directly. Use sparingly - excessive scraping may get your IP blocked by IMDb. Only applies to episodes.
                         </div>

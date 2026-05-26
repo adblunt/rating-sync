@@ -94,12 +94,7 @@ function (BaseView, loading, toast) {
                 mdbText = 'MDBList: ' + (data.MdbListUsed || 0) + (data.MdbListRateLimitEnabled && data.MdbListLimit ? ('/' + data.MdbListLimit) : '');
             }
 
-            var imdbText = 'IMDb scrapes: —';
-            if (data.ImdbEnabled) {
-                imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLimitEnabled && data.ImdbLimit ? ('/' + data.ImdbLimit) : '');
-            } else {
-                imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0);
-            }
+var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLimitEnabled && data.ImdbLimit ? ('/' + data.ImdbLimit) : '');
 
             var html = '';
             if (todayLabel) {
@@ -594,6 +589,10 @@ function (BaseView, loading, toast) {
                  if (imdbLimitInput) imdbLimitInput.value = config.ImdbDailyLimit || 1000;
                  var imdbLimitOptions = view.querySelector('#imdbLimitOptions');
                  if (imdbLimitOptions) imdbLimitOptions.style.display = imdbRateLimit ? 'block' : 'none';
+                 
+                 // Ensure IMDb limit controls are hidden unless scraping is enabled
+                 var imdbControls = view.querySelector('#imdbLimitOptions');
+                 if (imdbControls) imdbControls.style.display = (config.EnableImdbScraping && imdbRateLimit) ? 'block' : 'none';
                  
                 // Smart scanning settings
                 var rescanInput = view.querySelector('#txtRescanInterval');

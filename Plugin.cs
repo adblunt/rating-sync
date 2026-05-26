@@ -258,6 +258,10 @@ namespace RatingSync
 
         [DataMember]
         public int ImdbScrapesUsed { get; set; }
+        [DataMember]
+        public int ImdbLimit { get; set; }
+        [DataMember]
+        public bool ImdbRateLimitEnabled { get; set; }
     }
 
     [Route("/RatingSync/DeleteScan", "POST", Summary = "Deletes a scan session and its report")]
@@ -493,7 +497,9 @@ namespace RatingSync
                 MdbListLimit = config?.MdbListDailyLimit ?? 0,
                 MdbListHasKey = config != null && !string.IsNullOrWhiteSpace(config.MdbListApiKey),
                 MdbListRateLimitEnabled = config?.MdbListRateLimitEnabled ?? false,
-                ImdbScrapesUsed = ScanHistoryManager.GetTodayImdbScrapeCount()
+                ImdbScrapesUsed = ScanHistoryManager.GetTodayImdbScrapeCount(),
+                ImdbLimit = config?.ImdbDailyLimit ?? 0,
+                ImdbRateLimitEnabled = config?.ImdbRateLimitEnabled ?? false
             };
         }
 
@@ -1024,6 +1030,10 @@ namespace RatingSync
         public bool MdbListRateLimitEnabled { get; set; }
         public int MdbListDailyLimit { get; set; }
         
+        // Rate Limiting - IMDb Scraping
+        public bool ImdbRateLimitEnabled { get; set; }
+        public int ImdbDailyLimit { get; set; }
+
         // Rating Options
         public ApiMode ApiMode { get; set; }
         public bool UpdateCommunityRating { get; set; }
@@ -1064,7 +1074,8 @@ namespace RatingSync
             OmdbDailyLimit = 1000;
             MdbListRateLimitEnabled = true;
             MdbListDailyLimit = 1000;
-            ApiMode = ApiMode.OMDbWithMDBListFallback;
+            ImdbRateLimitEnabled = true;
+            ImdbDailyLimit = 1000;
             UpdateCommunityRating = true;
             UpdateCriticRating = true;
             CommunityRatingSource = CommunityRatingSource.IMDb;
@@ -1072,18 +1083,18 @@ namespace RatingSync
             AllowAlternateSourceFallback = true;
             MoviesRatingSource = CommunityRatingSource.IMDb;
             SeriesRatingSource = CommunityRatingSource.IMDb;
-            EpisodesRatingSource = CommunityRatingSource.IMDb;
-            UpdateMovies = true;
-            UpdateSeries = true;
-            UpdateEpisodes = false;
-            EnableImdbScraping = false;
-            RescanIntervalDays = 30;
-            PrioritizeRecentlyAdded = true;
-            RecentlyAddedDays = 7;
-            SkipUnratedOnly = false;
-            TestMode = false;
-        }
-    }
+EpisodesRatingSource = CommunityRatingSource.IMDb;
+             UpdateMovies = true;
+             UpdateSeries = true;
+             UpdateEpisodes = false;
+             EnableImdbScraping = false;
+             RescanIntervalDays = 30;
+             PrioritizeRecentlyAdded = true;
+             RecentlyAddedDays = 7;
+             SkipUnratedOnly = false;
+             TestMode = false;
+         }
+     }
 
     public enum RatingSource
     {
@@ -1743,8 +1754,10 @@ namespace RatingSync
             // Check daily API limits for each API
             var omdbRequests = ScanHistoryManager.GetTodayRequestCount("omdb");
             var mdblistRequests = ScanHistoryManager.GetTodayRequestCount("mdblist");
+            var imdbScrapesUsed = ScanHistoryManager.GetTodayImdbScrapeCount();
             var omdbLimitReached = config.OmdbRateLimitEnabled && omdbRequests >= config.OmdbDailyLimit;
             var mdblistLimitReached = config.MdbListRateLimitEnabled && mdblistRequests >= config.MdbListDailyLimit;
+            var imdbLimitReached = config.ImdbRateLimitEnabled && imdbScrapesUsed >= config.ImdbDailyLimit;
             
             // Log current API usage
             if (config.OmdbRateLimitEnabled && !string.IsNullOrEmpty(config.OmdbApiKey))
@@ -1755,6 +1768,10 @@ namespace RatingSync
             {
                 Log($"MDBList: {mdblistRequests}/{config.MdbListDailyLimit} requests used today{(mdblistLimitReached ? " (LIMIT REACHED)" : "")}", mdblistLimitReached ? "warning" : "info");
             }
+            if (config.ImdbRateLimitEnabled && config.EnableImdbScraping)
+            {
+                Log($"IMDb scraping: {imdbScrapesUsed}/{config.ImdbDailyLimit} scrapes used today{(imdbLimitReached ? " (LIMIT REACHED)" : "")}", imdbLimitReached ? "warning" : "info");
+            }
 
             var mdbListBlockedByApi = IsMdbListTemporarilyBlocked(out var mdbListBlockMessage);
             if (mdbListBlockedByApi && !string.IsNullOrWhiteSpace(mdbListBlockMessage))
@@ -1762,11 +1779,12 @@ namespace RatingSync
                 Log(mdbListBlockMessage, "warning");
             }
             
-            // Check if all APIs are at their limit
+            // Check if any API is available
             var hasOmdb = !string.IsNullOrEmpty(config.OmdbApiKey) && !omdbLimitReached;
             var hasMdbList = !string.IsNullOrEmpty(config.MdbListApiKey) && !mdblistLimitReached && !mdbListBlockedByApi;
+            var hasImdbScraping = config.EnableImdbScraping && !imdbLimitReached;
             
-            if (!hasOmdb && !hasMdbList)
+            if (!hasOmdb && !hasMdbList && !hasImdbScraping)
             {
                 Log("All configured APIs have reached their daily limits. Task will resume tomorrow.", "warning");
                 return;
@@ -1921,9 +1939,11 @@ namespace RatingSync
                     // Re-check API limits dynamically
                     var currentOmdbLimitReached = config.OmdbRateLimitEnabled && (omdbRequests + omdbCalls) >= config.OmdbDailyLimit;
                     var currentMdbListLimitReached = config.MdbListRateLimitEnabled && (mdblistRequests + mdblistCalls) >= config.MdbListDailyLimit;
+                    var currentImdbLimitReached = config.ImdbRateLimitEnabled && (imdbScrapesUsed + imdbScrapeCalls) >= config.ImdbDailyLimit;
                     var currentMdbListBlockedByApi = IsMdbListTemporarilyBlocked(out var currentMdbListBlockedMessage);
                     var currentHasOmdb = !string.IsNullOrEmpty(config.OmdbApiKey) && !currentOmdbLimitReached;
                     var currentHasMdbList = !string.IsNullOrEmpty(config.MdbListApiKey) && !currentMdbListLimitReached && !mdbListApiRateLimited && !currentMdbListBlockedByApi;
+                    var currentHasImdbScraping = config.EnableImdbScraping && !currentImdbLimitReached;
                     string currentMdbListUnavailableReason = null;
                     if (!currentHasMdbList)
                     {
@@ -1945,7 +1965,13 @@ namespace RatingSync
                         }
                     }
                     
-                    if (!currentHasOmdb && !currentHasMdbList)
+                    // For episodes, we need either OMDb or IMDb scraping (MDBList doesn't support episode lookups)
+                    // For movies/series, we need at least one of OMDb or MdbList
+                    var currentHasAvailableApi = item is Episode 
+                        ? currentHasOmdb || currentHasImdbScraping 
+                        : currentHasOmdb || currentHasMdbList;
+                    
+                    if (!currentHasAvailableApi)
                     {
                         Log("All APIs have reached their daily limits. Stopping for today.", "warning");
                         break;
@@ -2014,7 +2040,7 @@ namespace RatingSync
                             }
                         }
                         
-                        var ratings = await FetchRatings(imdbId, config, targetSource, episodeInfo, currentHasOmdb, currentHasMdbList);
+                        var ratings = await FetchRatings(imdbId, config, targetSource, episodeInfo, currentHasOmdb, currentHasMdbList, currentHasImdbScraping);
                         
                         // Track API calls
                         if (ratings.UsedOmdb)
@@ -2230,19 +2256,24 @@ namespace RatingSync
                 
                 ProgressTracker.Stop();
                 
-                // Build API usage summary
-                var apiUsage = new List<string>();
-                if (!string.IsNullOrEmpty(config.OmdbApiKey))
-                {
-                    var omdbTotal = omdbRequests + omdbCalls;
-                    apiUsage.Add($"OMDb: {omdbTotal}{(config.OmdbRateLimitEnabled ? "/" + config.OmdbDailyLimit : "")}");
-                }
-                if (!string.IsNullOrEmpty(config.MdbListApiKey))
-                {
-                    var mdblistTotal = mdblistRequests + mdblistCalls;
-                    apiUsage.Add($"MDBList: {mdblistTotal}{(config.MdbListRateLimitEnabled ? "/" + config.MdbListDailyLimit : "")}");
-                }
-                var apiInfo = apiUsage.Count > 0 ? $" | API calls: {string.Join(", ", apiUsage)}" : "";
+// Build API usage summary
+                 var apiUsage = new List<string>();
+                 if (!string.IsNullOrEmpty(config.OmdbApiKey))
+                 {
+                     var omdbTotal = omdbRequests + omdbCalls;
+                     apiUsage.Add($"OMDb: {omdbTotal}{(config.OmdbRateLimitEnabled ? "/" + config.OmdbDailyLimit : "")}");
+                 }
+                 if (!string.IsNullOrEmpty(config.MdbListApiKey))
+                 {
+                     var mdblistTotal = mdblistRequests + mdblistCalls;
+                     apiUsage.Add($"MDBList: {mdblistTotal}{(config.MdbListRateLimitEnabled ? "/" + config.MdbListDailyLimit : "")}");
+                 }
+                 if (config.EnableImdbScraping)
+                 {
+                     var imdbTotal = imdbScrapesUsed + imdbScrapeCalls;
+                     apiUsage.Add($"IMDb scraping: {imdbTotal}{(config.ImdbRateLimitEnabled ? "/" + config.ImdbDailyLimit : "")}");
+                 }
+                 var apiInfo = apiUsage.Count > 0 ? $" | API calls: {string.Join(", ", apiUsage)}" : "";
                 
                 Log($"Rating refresh completed! Processed: {processed}, Updated: {updated}, Skipped: {skipped}, Errors: {errors}{apiInfo}", "success");
             }
@@ -2281,7 +2312,7 @@ namespace RatingSync
             }
         }
 
-        private async Task<RatingData> FetchRatings(string imdbId, PluginConfiguration config, CommunityRatingSource targetSource, EpisodeInfo episodeInfo, bool canUseOmdb, bool canUseMdbList)
+        private async Task<RatingData> FetchRatings(string imdbId, PluginConfiguration config, CommunityRatingSource targetSource, EpisodeInfo episodeInfo, bool canUseOmdb, bool canUseMdbList, bool canUseImdbScraping = true)
         {
             var result = new RatingData();
 
@@ -2298,7 +2329,7 @@ namespace RatingSync
                 
                 // Fallback: use api.imdbapi.dev (unofficial IMDb API, no key required) if enabled and no rating found.
                 // This bypasses the AWS WAF that now blocks direct IMDb scraping.
-                if (!result.CommunityRating.HasValue && config.EnableImdbScraping)
+                if (!result.CommunityRating.HasValue && canUseImdbScraping)
                 {
                     result.ImdbScrapeAttempted = true;
                     float? apiRating = null;
