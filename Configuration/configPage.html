@@ -332,6 +332,11 @@
                         
                         <label class="checkboxContainer" style="margin-top: 1em;">
                             <input type="checkbox" is="emby-checkbox" id="chkEnableImdbScraping" />
+                                    <label style="display:block;margin-top:0.5em">IMDb scraping rate limit</label>
+                                    <label style="display:flex;gap:0.75em;align-items:center;margin-top:0.35em"><input type="checkbox" is="emby-checkbox" id="chkImdbRateLimit" /> Enable daily limit</label>
+                                    <div id="imdbLimitOptions" style="margin-top:0.5em">
+                                        <input type="number" id="txtImdbDailyLimit" style="width:8em;padding:0.45em;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.9)" />
+                                    </div>
                             <span>Enable IMDb Scraping (Episode Fallback)</span>
                         </label>
                         <div class="noteBox" style="margin-top: 0.5em;">

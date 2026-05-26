@@ -94,7 +94,12 @@ function (BaseView, loading, toast) {
                 mdbText = 'MDBList: ' + (data.MdbListUsed || 0) + (data.MdbListRateLimitEnabled && data.MdbListLimit ? ('/' + data.MdbListLimit) : '');
             }
 
-            var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0);
+            var imdbText = 'IMDb scrapes: —';
+            if (data.ImdbEnabled) {
+                imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLimitEnabled && data.ImdbLimit ? ('/' + data.ImdbLimit) : '');
+            } else {
+                imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0);
+            }
 
             var html = '';
             if (todayLabel) {
@@ -562,27 +567,34 @@ function (BaseView, loading, toast) {
                 setChecked('#chkUpdateMovies', config.UpdateMovies !== false);
                 setChecked('#chkUpdateSeries', config.UpdateSeries !== false);
                 setChecked('#chkUpdateEpisodes', config.UpdateEpisodes === true);
-                setChecked('#chkEnableImdbScraping', config.EnableImdbScraping === true);
-                
-                // API Rate Limiting settings
-                var omdbRateLimit = config.OmdbRateLimitEnabled === true;
-                var mdblistRateLimit = config.MdbListRateLimitEnabled === true;
-                setChecked('#chkOmdbRateLimit', omdbRateLimit);
-                
-                var omdbLimitInput = view.querySelector('#txtOmdbDailyLimit');
-                if (omdbLimitInput) omdbLimitInput.value = config.OmdbDailyLimit || 1000;
-                
-                var omdbLimitOptions = view.querySelector('#omdbLimitOptions');
-                if (omdbLimitOptions) omdbLimitOptions.style.display = omdbRateLimit ? 'block' : 'none';
-                
-                setChecked('#chkMdbListRateLimit', mdblistRateLimit);
-                
-                var mdbLimitInput = view.querySelector('#txtMdbListDailyLimit');
-                if (mdbLimitInput) mdbLimitInput.value = config.MdbListDailyLimit || 1000;
-                
-                var mdbLimitOptions = view.querySelector('#mdblistLimitOptions');
-                if (mdbLimitOptions) mdbLimitOptions.style.display = mdblistRateLimit ? 'block' : 'none';
-                
+                 setChecked('#chkEnableImdbScraping', config.EnableImdbScraping === true);
+                 
+                 // API Rate Limiting settings
+                 var omdbRateLimit = config.OmdbRateLimitEnabled === true;
+                 var mdblistRateLimit = config.MdbListRateLimitEnabled === true;
+                 var imdbRateLimit = config.ImdbRateLimitEnabled === true;
+                 setChecked('#chkOmdbRateLimit', omdbRateLimit);
+                 
+                 var omdbLimitInput = view.querySelector('#txtOmdbDailyLimit');
+                 if (omdbLimitInput) omdbLimitInput.value = config.OmdbDailyLimit || 1000;
+                 
+                 var omdbLimitOptions = view.querySelector('#omdbLimitOptions');
+                 if (omdbLimitOptions) omdbLimitOptions.style.display = omdbRateLimit ? 'block' : 'none';
+                 
+                 setChecked('#chkMdbListRateLimit', mdblistRateLimit);
+                 
+                 var mdbLimitInput = view.querySelector('#txtMdbListDailyLimit');
+                 if (mdbLimitInput) mdbLimitInput.value = config.MdbListDailyLimit || 1000;
+                 
+                 var mdbLimitOptions = view.querySelector('#mdblistLimitOptions');
+                 if (mdbLimitOptions) mdbLimitOptions.style.display = mdblistRateLimit ? 'block' : 'none';
+                 
+                 setChecked('#chkImdbRateLimit', imdbRateLimit);
+                 var imdbLimitInput = view.querySelector('#txtImdbDailyLimit');
+                 if (imdbLimitInput) imdbLimitInput.value = config.ImdbDailyLimit || 1000;
+                 var imdbLimitOptions = view.querySelector('#imdbLimitOptions');
+                 if (imdbLimitOptions) imdbLimitOptions.style.display = imdbRateLimit ? 'block' : 'none';
+                 
                 // Smart scanning settings
                 var rescanInput = view.querySelector('#txtRescanInterval');
                 if (rescanInput) rescanInput.value = config.RescanIntervalDays || 30;
@@ -686,14 +698,16 @@ function (BaseView, loading, toast) {
                 config.UpdateMovies = getChecked('#chkUpdateMovies');
                 config.UpdateSeries = getChecked('#chkUpdateSeries');
                 config.UpdateEpisodes = getChecked('#chkUpdateEpisodes');
-                config.EnableImdbScraping = getChecked('#chkEnableImdbScraping');
-                
-                // API Rate Limiting settings
-                config.OmdbRateLimitEnabled = getChecked('#chkOmdbRateLimit');
-                config.OmdbDailyLimit = parseInt(getValue('#txtOmdbDailyLimit'), 10) || 1000;
-                config.MdbListRateLimitEnabled = getChecked('#chkMdbListRateLimit');
-                config.MdbListDailyLimit = parseInt(getValue('#txtMdbListDailyLimit'), 10) || 1000;
-                
+                 config.EnableImdbScraping = getChecked('#chkEnableImdbScraping');
+                 
+                 // API Rate Limiting settings
+                 config.OmdbRateLimitEnabled = getChecked('#chkOmdbRateLimit');
+                 config.OmdbDailyLimit = parseInt(getValue('#txtOmdbDailyLimit'), 10) || 1000;
+                 config.MdbListRateLimitEnabled = getChecked('#chkMdbListRateLimit');
+                 config.MdbListDailyLimit = parseInt(getValue('#txtMdbListDailyLimit'), 10) || 1000;
+                 config.ImdbRateLimitEnabled = getChecked('#chkImdbRateLimit');
+                 config.ImdbDailyLimit = parseInt(getValue('#txtImdbDailyLimit'), 10) || 1000;
+                 
                 // Smart scanning settings
                 config.RescanIntervalDays = parseInt(getValue('#txtRescanInterval'), 10) || 30;
                 config.PrioritizeRecentlyAdded = getChecked('#chkPrioritizeRecent');
@@ -1249,13 +1263,19 @@ function (BaseView, loading, toast) {
                     view.querySelector('#omdbLimitOptions').style.display = this.checked ? 'block' : 'none';
                 });
             }
-            var chkMdbListRateLimit = view.querySelector('#chkMdbListRateLimit');
-            if (chkMdbListRateLimit) {
-                chkMdbListRateLimit.addEventListener('change', function() {
-                    view.querySelector('#mdblistLimitOptions').style.display = this.checked ? 'block' : 'none';
-                });
-            }
-            
+             var chkMdbListRateLimit = view.querySelector('#chkMdbListRateLimit');
+             if (chkMdbListRateLimit) {
+                 chkMdbListRateLimit.addEventListener('change', function() {
+                     view.querySelector('#mdblistLimitOptions').style.display = this.checked ? 'block' : 'none';
+                 });
+             }
+             var chkImdbRateLimit = view.querySelector('#chkImdbRateLimit');
+             if (chkImdbRateLimit) {
+                 chkImdbRateLimit.addEventListener('change', function() {
+                     view.querySelector('#imdbLimitOptions').style.display = this.checked ? 'block' : 'none';
+                 });
+             }
+
             // History tab bindings
             var btnLoadMissing = view.querySelector('#btnLoadMissing');
             if (btnLoadMissing) {
