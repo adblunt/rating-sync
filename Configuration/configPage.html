@@ -1,5 +1,5 @@
 <div is="emby-scroller"
-    data-controller="configurationpage?name=RatingSyncConfigurationjs_v109"
+    data-controller="configurationpage?name=RatingSyncConfigurationjs_v111"
     class="view flex flex-direction-column scrollFrameY flex-grow"
     data-horizontal="false"
     data-forcescrollbar="true"
@@ -14,6 +14,26 @@
         .imdb-config .selectContainer { margin-bottom: 1.5em; }
         .imdb-config .checkboxContainer { margin-bottom: 0.8em; }
         .imdb-config .verticalSection { margin-bottom: 2em; }
+        .imdb-config.contentColumn { max-width: 900px; }
+        .imdb-config .settingsSection { margin-bottom: 1.35em; padding: 1.15em; background: rgba(0,0,0,0.16); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; }
+        .imdb-config .settingsSection .sectionTitle { margin: 0 0 0.35em 0; }
+        .imdb-config .settingsIntro { margin: 0 0 1em 0; color: rgba(255,255,255,0.62); font-size: 0.92em; line-height: 1.4; }
+        .imdb-config .settingsGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1em; }
+        .imdb-config .settingsGrid.threeColumn { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .imdb-config .settingsCard { padding: 0.95em; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.055); border-radius: 6px; min-width: 0; }
+        .imdb-config .settingsCard .inputContainer:last-child,
+        .imdb-config .settingsCard .selectContainer:last-child,
+        .imdb-config .settingsCard .checkboxContainer:last-child { margin-bottom: 0; }
+        .imdb-config .subsectionTitle { margin: 0 0 0.75em 0; font-size: 0.95em; font-weight: 600; color: rgba(255,255,255,0.82); }
+        .imdb-config .nestedOption { margin: 0.55em 0 0 1.25em; padding-left: 0.85em; border-left: 2px solid rgba(255,255,255,0.08); }
+        .imdb-config .compactDescription { margin: 0.35em 0 0.9em 0; color: rgba(255,255,255,0.55); font-size: 0.86em; line-height: 1.35; }
+        .imdb-config .compatMessage { margin-top: 0.4em; display: none; }
+        .imdb-config .settingsList { margin: 0 0 1em 0; padding-left: 1.25em; color: rgba(255,255,255,0.68); font-size: 0.9em; line-height: 1.45; }
+        .imdb-config .saveBar { margin: 1.5em 0 0 0; padding-top: 1em; border-top: 1px solid rgba(255,255,255,0.08); }
+        @media (max-width: 760px) {
+            .imdb-config .settingsGrid,
+            .imdb-config .settingsGrid.threeColumn { grid-template-columns: 1fr; }
+        }
         .imdb-config .noteBox { background: rgba(232,124,3,0.2); border: 1px solid rgba(232,124,3,0.5); padding: 1em; border-radius: 4px; margin-bottom: 1em; }
         .imdb-config .noteBox strong { color: #e87c03; }
         .imdb-config .infoBox { background: rgba(0,164,220,0.15); border: 1px solid rgba(0,164,220,0.4); padding: 1em; border-radius: 4px; margin-bottom: 1em; }
@@ -217,7 +237,7 @@
     </style>
 
     <div class="scrollSlider flex-direction-column padded-left padded-left-page padded-right padded-top-page padded-bottom-page">
-        <div class="readOnlyContent auto-center imdb-config" style="max-width: 900px;">
+        <div class="readOnlyContent auto-center imdb-config contentColumn">
 
             <div data-role="controlgroup" data-type="horizontal" class="localnav">
                 <a is="emby-linkbutton" class="nav-button ui-btn-active" href="#" data-role="button" data-target="settingsPage">
@@ -238,196 +258,201 @@
             <!-- Settings Tab -->
             <div id="settingsPage" class="tabPage active">
                 <form class="imdbRefreshConfigForm">
-                    
-                    <div class="verticalSection">
-                        <h2 class="sectionTitle">API Keys</h2>
-                        <p style="margin-bottom: 1em;">Get free API keys to enable rating updates:</p>
-                        <ul style="margin-bottom: 1.5em; padding-left: 1.5em;">
-                            <li><strong>OMDb:</strong> <a href="http://www.omdbapi.com/apikey.aspx" target="_blank" is="emby-linkbutton" class="button-link">Get free key</a></li>
-                            <li><strong>MDBList:</strong> <a href="https://mdblist.com/preferences/" target="_blank" is="emby-linkbutton" class="button-link">Get free key</a></li>
-                        </ul>
+                    <div class="settingsSection">
+                        <h2 class="sectionTitle">Sources</h2>
+                        <p class="settingsIntro">Connect rating providers and choose how Rating Sync fills community and critic ratings.</p>
 
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="txtOmdbApiKey">OMDb API Key</label>
-                            <input id="txtOmdbApiKey" type="text" is="emby-input" />
-                            <div class="fieldDescription">API key for OMDb (http://www.omdbapi.com)</div>
-                        </div>
+                        <div class="settingsGrid">
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">API Keys</h3>
+                                <ul class="settingsList">
+                                    <li><strong>OMDb:</strong> <a href="http://www.omdbapi.com/apikey.aspx" target="_blank" is="emby-linkbutton" class="button-link">Get free key</a></li>
+                                    <li><strong>MDBList:</strong> <a href="https://mdblist.com/preferences/" target="_blank" is="emby-linkbutton" class="button-link">Get free key</a></li>
+                                </ul>
 
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="txtMdbListApiKey">MDBList API Key</label>
-                            <input id="txtMdbListApiKey" type="text" is="emby-input" />
-                            <div class="fieldDescription">API key for MDBList (https://mdblist.com)</div>
-                        </div>
-                    </div>
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="txtOmdbApiKey">OMDb API Key</label>
+                                    <input id="txtOmdbApiKey" type="text" is="emby-input" />
+                                    <div class="fieldDescription">Used for IMDb scores and Rotten Tomatoes critic data when available.</div>
+                                </div>
 
-                    <div class="verticalSection">
-                        <h2 class="sectionTitle">Rating Options</h2>
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="txtMdbListApiKey">MDBList API Key</label>
+                                    <input id="txtMdbListApiKey" type="text" is="emby-input" />
+                                    <div class="fieldDescription">Required for Popcorn scores and MDBList lookups.</div>
+                                </div>
+                            </div>
 
-                        <h3 class="sectionTitle" style="font-size: 1.05em; margin-top: 0.25em;">Critic Ratings (Tomatometer)</h3>
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">Rating Sources</h3>
+                                <div class="selectContainer">
+                                    <label class="selectLabel" for="selectApiMode">API Mode</label>
+                                    <select id="selectApiMode" is="emby-select">
+                                        <option value="OMDbOnly">OMDb only</option>
+                                        <option value="MDBListOnly">MDBList only</option>
+                                        <option value="OMDbWithMDBListFallback">OMDb with MDBList fallback</option>
+                                        <option value="MDBListWithOMDbFallback">MDBList with OMDb fallback</option>
+                                        <option value="Both">Both</option>
+                                    </select>
+                                    <div class="fieldDescription">Fallback modes try the other API when ratings are missing.</div>
+                                </div>
 
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="selectApiMode">API Mode</label>
-                            <select id="selectApiMode" is="emby-select">
-                                <option value="OMDbOnly">OMDb only</option>
-                                <option value="MDBListOnly">MDBList only</option>
-                                <option value="OMDbWithMDBListFallback">OMDb with MDBList fallback</option>
-                                <option value="MDBListWithOMDbFallback">MDBList with OMDb fallback</option>
-                                <option value="Both">Both</option>
-                            </select>
-                            <div class="fieldDescription">Choose how critic/community API data is fetched. In fallback modes, the plugin tries the other API if data is missing or unavailable.</div>
-                        </div>
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateCriticRating" />
+                                    <span>Enable Rotten Tomatoes Critic Rating (Tomatometer)</span>
+                                </label>
+                                <div class="compactDescription">Writes Rotten Tomatoes Tomatometer scores to Emby's Critic Rating field.</div>
 
-                        <label class="checkboxContainer">
-                            <input type="checkbox" is="emby-checkbox" id="chkUpdateCriticRating" />
-                            <span>Enable Critic Ratings (Tomatometer)</span>
-                        </label>
-                        <div class="fieldDescription" style="margin-bottom: 1.2em;">Updates Emby's Critic Rating using Rotten Tomatoes critic scores where available.</div>
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateCommunityRating" />
+                                    <span>Enable Community Ratings</span>
+                                </label>
+                                <div class="compactDescription">Updates Emby's Community Rating for movies and series.</div>
 
-                        <h3 class="sectionTitle" style="font-size: 1.05em;">Community Ratings</h3>
-
-                        <label class="checkboxContainer">
-                            <input type="checkbox" is="emby-checkbox" id="chkUpdateCommunityRating" />
-                            <span>Enable Community Ratings</span>
-                        </label>
-                        <div class="fieldDescription" style="margin-bottom: 0.8em;">Updates Emby's Community Rating for movies/series based on the selected metric below.</div>
-
-                        <div class="selectContainer" style="margin-bottom: 1.5em;">
-                            <label class="selectLabel" for="selectCommunityRatingSource">Community Metric (Movies & TV Series)</label>
-                            <select id="selectCommunityRatingSource" is="emby-select">
-                                <option value="IMDb">IMDb</option>
-                                <option value="Popcorn">Rotten Tomatoes Audience (Popcorn)</option>
-                            </select>
-                            <div class="fieldDescription">IMDb uses IMDb community score. Popcorn uses Rotten Tomatoes Audience score.</div>
-                            <div class="fieldDescription" id="communitySourceCompatMessage" style="margin-top: 0.4em; display: none;">Popcorn requires MDBList. API Mode was adjusted to include MDBList.</div>
-                        </div>
-                        <div class="infoBox">
-                            <strong>Helpful notes:</strong>
-                            Episodes always use <em>IMDb</em> for Community Rating.
-                            Popcorn requires MDBList (OMDb-only mode is not compatible).
-                            If an API is limited/unavailable, Run tab results show source-aware reasons.
-                        </div>
-                    </div>
-
-                    <div class="verticalSection">
-                        <h2 class="sectionTitle">Item Types to Update</h2>
-                        <div class="fieldDescription" style="margin-bottom: 1em;">Select which types of media to update ratings for:</div>
-                        
-                        <label class="checkboxContainer">
-                            <input type="checkbox" is="emby-checkbox" id="chkUpdateMovies" />
-                            <span>Movies</span>
-                        </label>
-                        
-                        <label class="checkboxContainer">
-                            <input type="checkbox" is="emby-checkbox" id="chkUpdateSeries" />
-                            <span>TV Series</span>
-                        </label>
-                        
-                        <label class="checkboxContainer">
-                            <input type="checkbox" is="emby-checkbox" id="chkUpdateEpisodes" />
-                            <span>TV Episodes</span>
-                        </label>
-                        <div class="infoBox" style="margin-top: 0.5em;">
-                            <strong>Note:</strong> Episodes only use OMDb API (MDBList doesn't support episode lookups). Enabling episodes will increase OMDb API calls significantly.
-                        </div>
-                        
-                        <label class="checkboxContainer" style="margin-top: 1em;">
-                            <input type="checkbox" is="emby-checkbox" id="chkEnableImdbScraping" />
-                            <span>Enable IMDb Scraping (Episode Fallback)</span>
-                        </label>
-
-                        <div style="margin-left: 1.25em; margin-top: 0.5em;">
-                            <label class="checkboxContainer">
-                                <input type="checkbox" is="emby-checkbox" id="chkImdbRateLimit" />
-                                <span>Enable daily limit</span>
-                            </label>
-                            <div class="inputContainer" id="imdbLimitOptions" style="margin-top: 0.5em;">
-                                <label class="inputLabel inputLabelUnfocused" for="txtImdbDailyLimit">Daily Limit</label>
-                                <input id="txtImdbDailyLimit" type="number" is="emby-input" min="100" max="100000" />
-                                <div class="fieldDescription">Free tier: 1,000/day</div>
+                                <div class="selectContainer">
+                                    <label class="selectLabel" for="selectCommunityRatingSource">Community Metric (Movies & TV Series)</label>
+                                    <select id="selectCommunityRatingSource" is="emby-select">
+                                        <option value="IMDb">IMDb</option>
+                                        <option value="Popcorn">Rotten Tomatoes Audience (Popcorn)</option>
+                                    </select>
+                                    <div class="fieldDescription">Episodes always use IMDb. Popcorn requires MDBList.</div>
+                                    <div class="fieldDescription compatMessage" id="communitySourceCompatMessage">Popcorn requires MDBList. API Mode was adjusted to include MDBList.</div>
+                                </div>
                             </div>
                         </div>
-                        <div class="noteBox" style="margin-top: 0.5em;">
-                            <strong>⚠️ Warning:</strong> When OMDb doesn't have an episode rating, this will scrape IMDb directly. Use sparingly - excessive scraping may get your IP blocked by IMDb. Only applies to episodes.
+                    </div>
+
+                    <div class="settingsSection">
+                        <h2 class="sectionTitle">Content</h2>
+                        <p class="settingsIntro">Choose which library items are eligible for rating updates.</p>
+
+                        <div class="settingsGrid">
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">Item Types</h3>
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateMovies" />
+                                    <span>Movies</span>
+                                </label>
+
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateSeries" />
+                                    <span>TV Series</span>
+                                </label>
+
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateEpisodes" />
+                                    <span>TV Episodes</span>
+                                </label>
+                                <div class="compactDescription">Episodes use OMDb first; optional IMDb fallback can fill gaps.</div>
+                            </div>
+
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">Episode Fallback</h3>
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkEnableImdbScraping" />
+                                    <span>Enable IMDb episode fallback</span>
+                                </label>
+                                <div class="compactDescription">When OMDb has no episode rating, Rating Sync can try IMDb-specific sources.</div>
+
+                                <div class="noteBox">
+                                    <strong>Use sparingly:</strong> IMDb fallback can make direct IMDb-side requests. A conservative daily limit helps avoid temporary blocks.
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="verticalSection">
-                        <h2 class="sectionTitle">API Rate Limiting</h2>
-                        <p style="margin-bottom: 1em;">Configure rate limits based on your API subscription tiers:</p>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5em;">
-                            <div style="padding: 1em; background: rgba(0,0,0,0.2); border-radius: 6px;">
-                                <h4 style="margin: 0 0 0.75em 0;">OMDb API</h4>
+                    <div class="settingsSection">
+                        <h2 class="sectionTitle">Limits</h2>
+                        <p class="settingsIntro">Set daily request budgets to match your provider tiers.</p>
+
+                        <div class="settingsGrid threeColumn">
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">OMDb API</h3>
                                 <label class="checkboxContainer">
                                     <input type="checkbox" is="emby-checkbox" id="chkOmdbRateLimit" />
                                     <span>Enable daily limit</span>
                                 </label>
-                                <div class="inputContainer" id="omdbLimitOptions" style="margin-top: 0.5em;">
+                                <div class="inputContainer" id="omdbLimitOptions">
                                     <label class="inputLabel inputLabelUnfocused" for="txtOmdbDailyLimit">Daily Limit</label>
                                     <input id="txtOmdbDailyLimit" type="number" is="emby-input" min="100" max="100000" />
-                                    <div class="fieldDescription">Free tier: 1,000/day</div>
+                                    <div class="fieldDescription">Default: 1,000/day</div>
                                 </div>
                             </div>
-                            
-                            <div style="padding: 1em; background: rgba(0,0,0,0.2); border-radius: 6px;">
-                                <h4 style="margin: 0 0 0.75em 0;">MDBList API</h4>
+
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">MDBList API</h3>
                                 <label class="checkboxContainer">
                                     <input type="checkbox" is="emby-checkbox" id="chkMdbListRateLimit" />
                                     <span>Enable daily limit</span>
                                 </label>
-                                <div class="inputContainer" id="mdblistLimitOptions" style="margin-top: 0.5em;">
+                                <div class="inputContainer" id="mdblistLimitOptions">
                                     <label class="inputLabel inputLabelUnfocused" for="txtMdbListDailyLimit">Daily Limit</label>
                                     <input id="txtMdbListDailyLimit" type="number" is="emby-input" min="100" max="100000" />
-                                    <div class="fieldDescription">Free tier: 1,000/day</div>
+                                    <div class="fieldDescription">Default: 1,000/day</div>
+                                </div>
+                            </div>
+
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">IMDb Fallback</h3>
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkImdbRateLimit" />
+                                    <span>Enable daily limit</span>
+                                </label>
+                                <div class="inputContainer" id="imdbLimitOptions">
+                                    <label class="inputLabel inputLabelUnfocused" for="txtImdbDailyLimit">Daily Limit</label>
+                                    <input id="txtImdbDailyLimit" type="number" is="emby-input" min="100" max="100000" />
+                                    <div class="fieldDescription">Default: 1,000/day</div>
+                                </div>
+                                <div class="compactDescription">Only applies when IMDb episode fallback is enabled.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settingsSection">
+                        <h2 class="sectionTitle">Scanning</h2>
+                        <p class="settingsIntro">Avoid repeated work and prioritize new media.</p>
+
+                        <div class="settingsGrid">
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">Smart Scanning</h3>
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="txtRescanInterval">Rescan Interval (Days)</label>
+                                    <input id="txtRescanInterval" type="number" is="emby-input" min="1" max="365" />
+                                    <div class="fieldDescription">Skip items scanned within this many days. Default: 30.</div>
+                                </div>
+
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkPrioritizeRecent" />
+                                    <span>Prioritize recently added content</span>
+                                </label>
+
+                                <div class="inputContainer">
+                                    <label class="inputLabel inputLabelUnfocused" for="txtRecentDays">Recently Added Period (Days)</label>
+                                    <input id="txtRecentDays" type="number" is="emby-input" min="1" max="90" />
+                                    <div class="fieldDescription">Items added in this window run first. Default: 7.</div>
+                                </div>
+
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkSkipUnratedOnly" />
+                                    <span>Only scan unrated items</span>
+                                </label>
+                                <div class="compactDescription">Skips items that already have a community rating.</div>
+                            </div>
+
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">First Run</h3>
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkTestMode" />
+                                    <span>Test mode (process one item)</span>
+                                </label>
+                                <div class="infoBox">
+                                    <strong>Recommended for first run:</strong> Process one item to confirm your keys and rating choices before scanning the full library.
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="verticalSection">
-                        <h2 class="sectionTitle">Smart Scanning</h2>
-                        <p style="margin-bottom: 1em;">Optimize scanning to focus on new content and avoid redundant API calls:</p>
-                        
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="txtRescanInterval">Rescan Interval (Days)</label>
-                            <input id="txtRescanInterval" type="number" is="emby-input" min="1" max="365" />
-                            <div class="fieldDescription">Skip items that have been scanned within this many days. Default: 30</div>
-                        </div>
-                        
-                        <label class="checkboxContainer">
-                            <input type="checkbox" is="emby-checkbox" id="chkPrioritizeRecent" />
-                            <span>Prioritize Recently Added Content</span>
-                        </label>
-                        
-                        <div class="inputContainer" style="margin-top: 0.5em;">
-                            <label class="inputLabel inputLabelUnfocused" for="txtRecentDays">Recently Added Period (Days)</label>
-                            <input id="txtRecentDays" type="number" is="emby-input" min="1" max="90" />
-                            <div class="fieldDescription">Items added within this period are processed first. Default: 7</div>
-                        </div>
-                        
-                        <label class="checkboxContainer">
-                            <input type="checkbox" is="emby-checkbox" id="chkSkipUnratedOnly" />
-                            <span>Only Scan Unrated Items</span>
-                        </label>
-                        <div class="fieldDescription" style="margin-bottom: 1em;">When enabled, skips items that already have a community rating.</div>
-                        
-                        <div class="infoBox">
-                            <strong>Tip:</strong> With a free API tier (1,000 requests/day), a library of 5,000 items would take ~5 days for a full scan. Smart scanning ensures newly added content gets ratings immediately.
-                        </div>
-                    </div>
-
-                    <div class="verticalSection">
-                        <h2 class="sectionTitle">Testing</h2>
-                        <label class="checkboxContainer">
-                            <input type="checkbox" is="emby-checkbox" id="chkTestMode" />
-                            <span>Test Mode (Process Only One Item)</span>
-                        </label>
-                        <div class="noteBox">
-                            <strong>RECOMMENDED FOR FIRST RUN:</strong> When enabled, only processes the first item found to test if everything is working correctly. Disable this to process your entire library.
-                        </div>
-                    </div>
-
-                    <div class="verticalSection">
+                    <div class="saveBar">
                         <button is="emby-button" type="submit" class="raised button-submit block">
                             <span>Save</span>
                         </button>

@@ -913,18 +913,18 @@ namespace RatingSync
                             return libraryPaths.Any(lp => seriesPath.StartsWith(lp));
                         });
                         
-                        foreach (var series in allSeries)
+                        var selectedSeries = allSeries.ToList();
+
+                        if (config.UpdateSeries)
                         {
-                            // Add the series itself
-                            if (config.UpdateSeries)
-                            {
-                                items.Add(series);
-                            }
-                            // Then add all episodes
-                            if (config.UpdateEpisodes)
-                            {
-                                items.AddRange(series.GetRecursiveChildren().OfType<Episode>().Where(e => (e.ParentIndexNumber ?? 0) != 0));
-                            }
+                            items.AddRange(selectedSeries);
+                        }
+
+                        if (config.UpdateEpisodes)
+                        {
+                            items.AddRange(selectedSeries
+                                .SelectMany(s => s.GetRecursiveChildren().OfType<Episode>())
+                                .Where(e => (e.ParentIndexNumber ?? 0) != 0));
                         }
                     }
                 }
@@ -1000,12 +1000,12 @@ namespace RatingSync
             {
                 new PluginPageInfo
                 {
-                    Name = "RatingSyncConfiguration_v109",
+                    Name = "RatingSyncConfiguration_v111",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html"
                 },
                 new PluginPageInfo
                 {
-                    Name = "RatingSyncConfigurationjs_v109",
+                    Name = "RatingSyncConfigurationjs_v111",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.js"
                 }
             };
@@ -1965,18 +1965,6 @@ EpisodesRatingSource = CommunityRatingSource.IMDb;
                         }
                     }
                     
-                    // For episodes, we need either OMDb or IMDb scraping (MDBList doesn't support episode lookups)
-                    // For movies/series, we need at least one of OMDb or MdbList
-                    var currentHasAvailableApi = item is Episode 
-                        ? currentHasOmdb || currentHasImdbScraping 
-                        : currentHasOmdb || currentHasMdbList;
-                    
-                    if (!currentHasAvailableApi)
-                    {
-                        Log("All APIs have reached their daily limits. Stopping for today.", "warning");
-                        break;
-                    }
-
                     var itemName = $"{item.Name}";
                     var itemId = item.InternalId.ToString();
                     var imdbId = item.GetProviderId(MetadataProviders.Imdb);
@@ -2012,6 +2000,50 @@ EpisodesRatingSource = CommunityRatingSource.IMDb;
                             continue;
                         }
                     }
+
+                    // For episodes, we need either OMDb or IMDb fallback (MDBList doesn't support episode lookups).
+                    // For movies/series, we need at least one of OMDb or MdbList.
+                    var currentHasAvailableApi = item is Episode
+                        ? currentHasOmdb || currentHasImdbScraping
+                        : currentHasOmdb || currentHasMdbList;
+
+                    if (!currentHasAvailableApi)
+                    {
+                        if (item is Episode)
+                        {
+                            var episodeSkipReasons = new List<string>();
+                            if (string.IsNullOrWhiteSpace(config.OmdbApiKey))
+                                episodeSkipReasons.Add("OMDb unavailable: no API key configured");
+                            else if (currentOmdbLimitReached && config.OmdbRateLimitEnabled)
+                                episodeSkipReasons.Add($"OMDb daily limit reached ({omdbRequests + omdbCalls}/{config.OmdbDailyLimit})");
+
+                            if (!config.EnableImdbScraping)
+                                episodeSkipReasons.Add("IMDb episode fallback disabled");
+                            else if (currentImdbLimitReached && config.ImdbRateLimitEnabled)
+                                episodeSkipReasons.Add($"IMDb episode fallback daily limit reached ({imdbScrapesUsed + imdbScrapeCalls}/{config.ImdbDailyLimit})");
+
+                            episodeSkipReasons.Add("MDBList does not support episode lookups");
+
+                            var episodeSkipReason = string.Join(", ", episodeSkipReasons);
+                            skipped++;
+                            processed++;
+                            ProgressTracker.AddSkipped(itemName, episodeSkipReason);
+                            Log($"⊘ Skipped '{itemName}' - {episodeSkipReason}", "skip");
+                            ProgressTracker.UpdateProgress(processed, updated, skipped, errors, itemName);
+                            progress.Report((double)processed / items.Count * 100);
+                            if (processed % 10 == 0)
+                            {
+                                ScanHistoryManager.Save();
+                            }
+                            continue;
+                        }
+
+                        var stopReason = currentMdbListLimitReached || mdbListApiRateLimited || currentMdbListBlockedByApi
+                            ? "All usable APIs have reached their limits. Stopping for today."
+                            : "No usable rating source is available. Stopping for today.";
+                        Log(stopReason, "warning");
+                        break;
+                    }
                     
                     ProgressTracker.UpdateProgress(processed, updated, skipped, errors, itemName);
 
@@ -2040,7 +2072,11 @@ EpisodesRatingSource = CommunityRatingSource.IMDb;
                             }
                         }
                         
-                        var ratings = await FetchRatings(imdbId, config, targetSource, episodeInfo, currentHasOmdb, currentHasMdbList, currentHasImdbScraping);
+                        var currentImdbScrapesRemaining = config.ImdbRateLimitEnabled
+                            ? Math.Max(0, config.ImdbDailyLimit - (imdbScrapesUsed + imdbScrapeCalls))
+                            : int.MaxValue;
+
+                        var ratings = await FetchRatings(imdbId, config, targetSource, episodeInfo, currentHasOmdb, currentHasMdbList, currentHasImdbScraping, currentImdbScrapesRemaining);
                         
                         // Track API calls
                         if (ratings.UsedOmdb)
@@ -2062,10 +2098,10 @@ EpisodesRatingSource = CommunityRatingSource.IMDb;
                                 : ratings.MdbListRateLimitMessage;
                             Log(limitMsg, "warning");
                         }
-                        if (ratings.ImdbScrapeAttempted)
+                        if (ratings.ImdbScrapeRequests > 0)
                         {
-                            imdbScrapeCalls++;
-                            ScanHistoryManager.IncrementImdbScrapeCount();
+                            imdbScrapeCalls += ratings.ImdbScrapeRequests;
+                            ScanHistoryManager.IncrementImdbScrapeCount(ratings.ImdbScrapeRequests);
                         }
 
                         // Determine source label for display
@@ -2312,9 +2348,21 @@ EpisodesRatingSource = CommunityRatingSource.IMDb;
             }
         }
 
-        private async Task<RatingData> FetchRatings(string imdbId, PluginConfiguration config, CommunityRatingSource targetSource, EpisodeInfo episodeInfo, bool canUseOmdb, bool canUseMdbList, bool canUseImdbScraping = true)
+        private async Task<RatingData> FetchRatings(string imdbId, PluginConfiguration config, CommunityRatingSource targetSource, EpisodeInfo episodeInfo, bool canUseOmdb, bool canUseMdbList, bool canUseImdbScraping = true, int imdbScrapesRemaining = int.MaxValue)
         {
             var result = new RatingData();
+            var remainingImdbScrapes = canUseImdbScraping ? Math.Max(0, imdbScrapesRemaining) : 0;
+
+            async Task<T> TryImdbScrapeRequest<T>(Func<Task<T>> fetch, T defaultValue = default(T))
+            {
+                if (remainingImdbScrapes <= 0)
+                    return defaultValue;
+
+                remainingImdbScrapes--;
+                result.ImdbScrapeAttempted = true;
+                result.ImdbScrapeRequests++;
+                return await fetch();
+            }
 
             // Episodes only work with OMDb (MDBList doesn't support episode lookups)
             if (episodeInfo != null)
@@ -2331,19 +2379,18 @@ EpisodesRatingSource = CommunityRatingSource.IMDb;
                 // This bypasses the AWS WAF that now blocks direct IMDb scraping.
                 if (!result.CommunityRating.HasValue && canUseImdbScraping)
                 {
-                    result.ImdbScrapeAttempted = true;
                     float? apiRating = null;
 
                     if (!string.IsNullOrWhiteSpace(imdbId))
                     {
                         // Prefer querying the episode's own tt-id directly.
-                        apiRating = await FetchImdbApiDevRating(imdbId);
+                        apiRating = await TryImdbScrapeRequest(() => FetchImdbApiDevRating(imdbId));
                     }
 
                     if (!apiRating.HasValue && !string.IsNullOrWhiteSpace(episodeInfo.SeriesImdbId))
                     {
                         // Fall back to the season list endpoint to find this episode.
-                        apiRating = await FetchImdbApiDevEpisodeRating(episodeInfo.SeriesImdbId, episodeInfo.SeasonNumber, episodeInfo.EpisodeNumber);
+                        apiRating = await TryImdbScrapeRequest(() => FetchImdbApiDevEpisodeRating(episodeInfo.SeriesImdbId, episodeInfo.SeasonNumber, episodeInfo.EpisodeNumber));
                     }
 
                     if (apiRating.HasValue)
@@ -2356,9 +2403,21 @@ EpisodesRatingSource = CommunityRatingSource.IMDb;
                         // Last resort: try direct HTML scraping (may be blocked by WAF).
                         float? scrapedRating = null;
                         if (!string.IsNullOrWhiteSpace(imdbId))
-                            scrapedRating = await ScrapeImdbRating(imdbId);
+                        {
+                            scrapedRating = await TryImdbScrapeRequest(() => ScrapeImdbRating(imdbId));
+                        }
                         else
-                            scrapedRating = await ScrapeImdbEpisodeRating(episodeInfo);
+                        {
+                            var episodeImdbId = await TryImdbScrapeRequest(
+                                () => TryResolveEpisodeImdbIdFromSeriesEpisodesPage(
+                                    episodeInfo.SeriesImdbId,
+                                    episodeInfo.SeasonNumber,
+                                    episodeInfo.EpisodeNumber),
+                                null);
+
+                            if (!string.IsNullOrWhiteSpace(episodeImdbId))
+                                scrapedRating = await TryImdbScrapeRequest(() => ScrapeImdbRating(episodeImdbId));
+                        }
 
                         if (scrapedRating.HasValue)
                         {
@@ -3019,6 +3078,7 @@ EpisodesRatingSource = CommunityRatingSource.IMDb;
             public bool UsedMdbList { get; set; }
             public bool UsedScraping { get; set; }
             public bool ImdbScrapeAttempted { get; set; }
+            public int ImdbScrapeRequests { get; set; }
             public bool MdbListRateLimited { get; set; }
             public string MdbListRateLimitMessage { get; set; }
             public DateTime? MdbListRateLimitUntilUtc { get; set; }

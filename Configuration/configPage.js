@@ -587,12 +587,7 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                  setChecked('#chkImdbRateLimit', imdbRateLimit);
                  var imdbLimitInput = view.querySelector('#txtImdbDailyLimit');
                  if (imdbLimitInput) imdbLimitInput.value = config.ImdbDailyLimit || 1000;
-                 var imdbLimitOptions = view.querySelector('#imdbLimitOptions');
-                 if (imdbLimitOptions) imdbLimitOptions.style.display = imdbRateLimit ? 'block' : 'none';
-                 
-                 // Ensure IMDb limit controls are hidden unless scraping is enabled
-                 var imdbControls = view.querySelector('#imdbLimitOptions');
-                 if (imdbControls) imdbControls.style.display = (config.EnableImdbScraping && imdbRateLimit) ? 'block' : 'none';
+                 self.updateImdbLimitVisibility(view);
                  
                 // Smart scanning settings
                 var rescanInput = view.querySelector('#txtRescanInterval');
@@ -728,6 +723,15 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                 loading.hide();
                 toast({ text: 'Error saving configuration. See browser console for details.' });
             });
+        }
+
+        updateImdbLimitVisibility(view) {
+            var fallback = view.querySelector('#chkEnableImdbScraping');
+            var limit = view.querySelector('#chkImdbRateLimit');
+            var options = view.querySelector('#imdbLimitOptions');
+            if (options) {
+                options.style.display = (fallback && fallback.checked && limit && limit.checked) ? 'block' : 'none';
+            }
         }
 
         formatTime(date) {
@@ -1271,7 +1275,13 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
              var chkImdbRateLimit = view.querySelector('#chkImdbRateLimit');
              if (chkImdbRateLimit) {
                  chkImdbRateLimit.addEventListener('change', function() {
-                     view.querySelector('#imdbLimitOptions').style.display = this.checked ? 'block' : 'none';
+                     self.updateImdbLimitVisibility(view);
+                 });
+             }
+             var chkEnableImdbScraping = view.querySelector('#chkEnableImdbScraping');
+             if (chkEnableImdbScraping) {
+                 chkEnableImdbScraping.addEventListener('change', function() {
+                     self.updateImdbLimitVisibility(view);
                  });
              }
 

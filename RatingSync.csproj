@@ -12,8 +12,8 @@
     -->
 <VersionPrefix>1.0.10</VersionPrefix>
       <VersionSuffix></VersionSuffix>
-      <AssemblyVersion>$(VersionPrefix).1</AssemblyVersion>
-      <FileVersion>$(VersionPrefix).1</FileVersion>
+      <AssemblyVersion>$(VersionPrefix).5</AssemblyVersion>
+      <FileVersion>$(VersionPrefix).5</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <!-- Don't copy referenced assemblies to output -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
