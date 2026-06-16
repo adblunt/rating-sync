@@ -5,9 +5,9 @@
 <h1 align="center">Rating Sync</h1>
 
 <p align="center">
-	An Emby plugin to sync <b>IMDb/Popcorn community ratings</b> and <b>Rotten Tomatoes critic ratings</b> into your library metadata.
+	An Emby plugin to sync community and critic ratings from IMDb, Rotten Tomatoes, Metacritic, MDBList, Trakt, TMDb, Letterboxd, and more into your library metadata.
 	<br />
-	Smart scanning • Rate limiting • Progress tracking • Scan history
+	Per-type source selection • Smart scanning • Rate limiting • Progress tracking • Scan history
 </p>
 
 <p align="center">
@@ -28,14 +28,33 @@
 ## Features
 
 - Updates **Movies**, **Series**, and optionally **Episodes**
-- Configurable **Community Rating source** per media type (IMDb vs Rotten Tomatoes Audience/Popcorn)
-- Supports **OMDb** and/or **MDBList** (configurable preferred source)
+- **Community Rating source** configurable per media type — choose independently for Movies and TV Series:
+  - IMDb, RT Audience (Popcorn), Metacritic (Critic), Metacritic (User), MDBList Score, Trakt, TMDb, Letterboxd, Roger Ebert
+- **Critic Rating source** configurable per media type — RT Tomatometer, Metacritic, or fallback chains (RT→MC / MC→RT)
+- Supports **OMDb** and/or **MDBList** (configurable preferred source with fallback modes)
 - Optional **IMDb scraping fallback** for episode ratings
 - Built-in **rate limiting** + daily limits per API
 - **Smart scanning**: rescan interval, prioritize recently added, skip already-rated (optional)
 - **Progress API** + detailed results (updated/skipped/errors)
 - **Scan history** + per-session reports
 - Missing data views (e.g., missing IMDb id / ratings) and item-level scan history
+
+## Rating sources
+
+| Source | Scale | Provider |
+|---|---|---|
+| IMDb | 0–10 | OMDb or MDBList |
+| RT Audience (Popcorn) | 0–100 → 0–10 | MDBList |
+| Metacritic (Critic) | 0–100 → 0–10 | MDBList |
+| Metacritic (User) | 0–10 | MDBList |
+| MDBList Score | 0–100 → 0–10 | MDBList |
+| Trakt | 0–100 → 0–10 | MDBList |
+| TMDb | 0–100 → 0–10 | MDBList |
+| Letterboxd | 0–5 → 0–10 | MDBList |
+| Roger Ebert | 0–4 stars × 2.5 | MDBList |
+| RT Tomatometer (critic) | 0–100 | OMDb or MDBList |
+
+Episodes are always sourced from IMDb. All sources except IMDb require an MDBList API key.
 
 ## Install
 
@@ -46,24 +65,19 @@
 
 ## Quick start
 
-1. Add at least one API key (OMDb and/or MDBList).
-2. Pick your preferred rating source and what item types to update.
-3. (Optional) Enable episode scraping fallback if you want episode ratings.
-4. Go to the **Run** tab and start a refresh.
+1. Add at least one API key under **API Setup** (OMDb and/or MDBList).
+2. Under **Rating Sources**, pick community and critic sources for Movies and TV Series.
+3. Under **Content**, choose which item types to update.
+4. (Optional) Enable episode scraping fallback for episode ratings.
+5. Go to the **Run** tab and start a refresh.
 
 ## UI tour
 
 ### Settings
 
-Configure API keys, rating sources, item types, and rate limiting.
+Configure API keys and rate limits, rating sources per content type, and scan behaviour — all in one page.
 
 <img src="docs/screenshots/settings.png" alt="Rating Sync settings" width="900" />
-
-### Smart scanning
-
-Avoid redundant API calls by controlling how often items are rescanned and prioritizing recently added content.
-
-<img src="docs/screenshots/smart-scanning.png" alt="Smart scanning" width="900" />
 
 ### Run
 
@@ -91,12 +105,9 @@ Browse recent scans, find items with missing data, and inspect item-level scan h
 dotnet build -c Release
 ```
 
-Output:
-- `bin\Release\RatingSync.dll`
+Output: `bin\Release\RatingSync.dll`
 
 ### Building against a local Emby install (optional)
-
-If you have Emby installed locally, you can build against its `System` DLLs:
 
 ```powershell
 dotnet build -c Release -p:EmbyPath="C:\Program Files\Emby-Server\System"
@@ -104,10 +115,7 @@ dotnet build -c Release -p:EmbyPath="C:\Program Files\Emby-Server\System"
 
 ## Release process (automated)
 
-This repo is set up so that pushing a tag like `v1.2.3` will:
-- Build `Release`
-- Create a GitHub Release
-- Upload `RatingSync.dll` (and a zip) as release assets
+Pushing a tag like `v1.2.3` will build Release, create a GitHub Release, and upload `RatingSync.dll` (and a zip) as assets.
 
 See [RELEASING.md](RELEASING.md).
 

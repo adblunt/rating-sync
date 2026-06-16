@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.1.2] - 2026-06-16
+
+- Improvement: Settings page restructured into three logical sections — API Setup (keys + mode + rate limits), Rating Sources (community + critic per type), Content (item types + scanning).
+- Improvement: Target framework upgraded from net462 to net472; eliminates ~90 netstandard shim DLLs from build output (deploy only `RatingSync.dll`).
+
+## [1.1.1] - 2026-06-15
+
+- Feature: Added 7 new community rating sources via MDBList API — Metacritic (Critic), Metacritic (User), MDBList Score, Trakt, TMDb, Letterboxd, Roger Ebert.
+- Feature: Community Rating source is now configurable independently for Movies and TV Series (episodes always use IMDb).
+- Feature: New Critic Rating Source selector per type — RT Tomatometer, Metacritic, RT with Metacritic fallback, Metacritic with RT fallback, or None.
+- Improvement: Settings UI redesigned with blue accent colour scheme and card layout.
+
 ## [1.0.10.1] - 2026-05-26
 
 - Fix: IMDb scraping rate limit now properly enforced - prevents scraping when daily limit is reached and stops at the configured limit during batch processing.

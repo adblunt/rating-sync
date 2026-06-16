@@ -1,5 +1,5 @@
 <div is="emby-scroller"
-    data-controller="configurationpage?name=RatingSyncConfigurationjs_v111"
+    data-controller="configurationpage?name=RatingSyncConfigurationjs_v114"
     class="view flex flex-direction-column scrollFrameY flex-grow"
     data-horizontal="false"
     data-forcescrollbar="true"
@@ -8,232 +8,359 @@
     data-title="Rating Sync">
     
     <style>
-        .imdb-config .sectionTitle { margin-bottom: 0.5em; }
-        .imdb-config .fieldDescription { margin-top: 0.3em; color: rgba(255,255,255,0.6); font-size: 0.9em; }
+        /* === Design tokens (matches Ratings Plus) === */
+        .imdb-config {
+            --rs-accent:        #1a73e8;
+            --rs-accent-light:  rgba(26,115,232,0.10);
+            --rs-accent-border: rgba(26,115,232,0.30);
+            --rs-card-bg:       #f8f9fa;
+            --rs-card-border:   #e0e3e7;
+            --rs-input-bg:      #ffffff;
+            --rs-input-border:  #c5c8cc;
+            --rs-text:          #1f2329;
+            --rs-text-muted:    #5f6368;
+            --rs-radius-card:   10px;
+            --rs-radius-input:  7px;
+            --rs-green:         #2d9e5a;
+            --rs-orange:        #e87c03;
+            --rs-red:           #d93025;
+        }
+
+        /* === Base === */
         .imdb-config .inputContainer { margin-bottom: 1.5em; }
         .imdb-config .selectContainer { margin-bottom: 1.5em; }
-        .imdb-config .checkboxContainer { margin-bottom: 0.8em; }
         .imdb-config .verticalSection { margin-bottom: 2em; }
         .imdb-config.contentColumn { max-width: 900px; }
-        .imdb-config .settingsSection { margin-bottom: 1.35em; padding: 1.15em; background: rgba(0,0,0,0.16); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; }
-        .imdb-config .settingsSection .sectionTitle { margin: 0 0 0.35em 0; }
-        .imdb-config .settingsIntro { margin: 0 0 1em 0; color: rgba(255,255,255,0.62); font-size: 0.92em; line-height: 1.4; }
+        .imdb-config .compatMessage { margin-top: 0.4em; display: none; }
+        .imdb-config .hide { display: none !important; }
+
+        /* === Selects === */
+        .imdb-config .selectContainer select,
+        .imdb-config select[is="emby-select"] {
+            width: 100%;
+            box-sizing: border-box;
+            background: var(--rs-input-bg) !important;
+            border: 1px solid var(--rs-input-border) !important;
+            border-radius: var(--rs-radius-input) !important;
+            color: var(--rs-text) !important;
+            padding: 0.55em 2.2em 0.55em 0.85em !important;
+            font-size: 0.9em !important;
+            outline: none !important;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            -webkit-appearance: none !important;
+            appearance: none !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.06) !important;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%231a73e8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75em center !important;
+            background-size: 14px !important;
+            cursor: pointer !important;
+        }
+        .imdb-config .selectContainer select:hover,
+        .imdb-config select[is="emby-select"]:hover { border-color: var(--rs-accent) !important; }
+        .imdb-config .selectContainer select:focus,
+        .imdb-config select[is="emby-select"]:focus {
+            border-color: var(--rs-accent) !important;
+            box-shadow: 0 0 0 3px var(--rs-accent-light) !important;
+        }
+        .imdb-config .selectLabel {
+            display: block;
+            margin-bottom: 0.4em;
+            font-size: 0.88em;
+            font-weight: 600;
+            color: var(--rs-text);
+        }
+
+        /* === Inputs === */
+        .imdb-config input[type="text"][is="emby-input"],
+        .imdb-config input[type="number"][is="emby-input"] {
+            background: var(--rs-input-bg) !important;
+            border: 1px solid var(--rs-input-border) !important;
+            border-radius: var(--rs-radius-input) !important;
+            color: var(--rs-text) !important;
+            padding: 0.55em 0.85em !important;
+            font-size: 0.9em !important;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .imdb-config input[type="text"][is="emby-input"]:focus,
+        .imdb-config input[type="number"][is="emby-input"]:focus {
+            border-color: var(--rs-accent) !important;
+            box-shadow: 0 0 0 3px var(--rs-accent-light) !important;
+            outline: none !important;
+        }
+        .imdb-config .inputLabel { color: var(--rs-text) !important; font-size: 0.88em !important; font-weight: 600 !important; }
+        .imdb-config .fieldDescription { margin-top: 0.35em; color: var(--rs-text-muted); font-size: 0.87em; line-height: 1.4; }
+
+        /* === Checkboxes === */
+        .imdb-config .checkboxContainer { margin-bottom: 0.8em; color: var(--rs-text); }
+        .imdb-config input[is="emby-checkbox"],
+        .imdb-config input[type="checkbox"] { accent-color: var(--rs-accent); }
+
+        /* === Settings sections & cards === */
+        .imdb-config .settingsSection {
+            margin-bottom: 1.35em;
+            padding: 1.3em 1.5em;
+            background: var(--rs-card-bg);
+            border: 1px solid var(--rs-card-border);
+            border-radius: var(--rs-radius-card);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            color: var(--rs-text);
+        }
+        .imdb-config .settingsSection .sectionTitle {
+            margin: 0 0 0.2em 0;
+            color: var(--rs-accent);
+            font-size: 0.82em;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+        }
+        .imdb-config .settingsSection .sectionTitle::before {
+            content: '';
+            display: inline-block;
+            width: 3px;
+            height: 1em;
+            background: var(--rs-accent);
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .imdb-config .settingsIntro { margin: 0.3em 0 1em 0; color: var(--rs-text-muted); font-size: 0.88em; line-height: 1.5; }
         .imdb-config .settingsGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1em; }
         .imdb-config .settingsGrid.threeColumn { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-        .imdb-config .settingsCard { padding: 0.95em; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.055); border-radius: 6px; min-width: 0; }
-        .imdb-config .settingsCard .inputContainer:last-child,
-        .imdb-config .settingsCard .selectContainer:last-child,
-        .imdb-config .settingsCard .checkboxContainer:last-child { margin-bottom: 0; }
-        .imdb-config .subsectionTitle { margin: 0 0 0.75em 0; font-size: 0.95em; font-weight: 600; color: rgba(255,255,255,0.82); }
-        .imdb-config .nestedOption { margin: 0.55em 0 0 1.25em; padding-left: 0.85em; border-left: 2px solid rgba(255,255,255,0.08); }
-        .imdb-config .compactDescription { margin: 0.35em 0 0.9em 0; color: rgba(255,255,255,0.55); font-size: 0.86em; line-height: 1.35; }
-        .imdb-config .compatMessage { margin-top: 0.4em; display: none; }
-        .imdb-config .settingsList { margin: 0 0 1em 0; padding-left: 1.25em; color: rgba(255,255,255,0.68); font-size: 0.9em; line-height: 1.45; }
-        .imdb-config .saveBar { margin: 1.5em 0 0 0; padding-top: 1em; border-top: 1px solid rgba(255,255,255,0.08); }
         @media (max-width: 760px) {
             .imdb-config .settingsGrid,
             .imdb-config .settingsGrid.threeColumn { grid-template-columns: 1fr; }
         }
-        .imdb-config .noteBox { background: rgba(232,124,3,0.2); border: 1px solid rgba(232,124,3,0.5); padding: 1em; border-radius: 4px; margin-bottom: 1em; }
-        .imdb-config .noteBox strong { color: #e87c03; }
-        .imdb-config .infoBox { background: rgba(0,164,220,0.15); border: 1px solid rgba(0,164,220,0.4); padding: 1em; border-radius: 4px; margin-bottom: 1em; }
-        .imdb-config .infoBox strong { color: #00a4dc; }
-        .imdb-config .localnav { margin-bottom: 0.6em; display: flex; gap: 0.5em; flex-wrap: wrap; }
-        .imdb-config .nav-button { padding: 0.6em 1.2em; border-radius: 6px; background: rgba(255,255,255,0.1); display: flex; flex-direction: column; align-items: flex-start; gap: 0.25em; min-width: 150px; }
-        .imdb-config .nav-button.ui-btn-active { background: #00a4dc; }
-        .imdb-config .navTitle { font-weight: 600; }
-        .imdb-config .navSub { font-size: 0.76em; color: rgba(255,255,255,0.72); line-height: 1.2; }
-        .imdb-config .navSub .apiBadge { display: inline-flex; align-items: center; gap: 0.45em; padding: 0.2em 0.55em; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(0,0,0,0.20); margin-right: 0.4em; }
-        .imdb-config .navSub .apiDot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.45); }
-        .imdb-config .navSub .apiDot.omdb { background: rgba(82,196,26,0.95); }
-        .imdb-config .navSub .apiDot.mdblist { background: rgba(250,173,20,0.95); }
-        .imdb-config .navSub .apiDot.imdb { background: rgba(163,89,255,0.95); }
+        .imdb-config .settingsCard {
+            padding: 1.1em;
+            background: var(--rs-input-bg);
+            border: 1px solid var(--rs-card-border);
+            border-radius: 8px;
+            min-width: 0;
+        }
+        .imdb-config .settingsCard .inputContainer:last-child,
+        .imdb-config .settingsCard .selectContainer:last-child,
+        .imdb-config .settingsCard .checkboxContainer:last-child { margin-bottom: 0; }
+        .imdb-config .subsectionTitle { margin: 0 0 0.75em 0; font-size: 0.92em; font-weight: 600; color: var(--rs-text); }
+        .imdb-config .nestedOption { margin: 0.55em 0 0 1.25em; padding-left: 0.85em; border-left: 2px solid var(--rs-card-border); }
+        .imdb-config .compactDescription { margin: 0.35em 0 0.9em 0; color: var(--rs-text-muted); font-size: 0.86em; line-height: 1.35; }
+        .imdb-config .settingsList { margin: 0 0 1em 0; padding-left: 1.25em; color: var(--rs-text-muted); font-size: 0.9em; line-height: 1.45; }
+        .imdb-config .settingsList a { color: var(--rs-accent); }
+        .imdb-config .saveBar { margin: 1.5em 0 0 0; padding-top: 1em; border-top: 1px solid var(--rs-card-border); }
 
-        .imdb-config .apiCountersBar { margin: 0 0 1.5em 0; padding: 0.65em 0.9em; border-radius: 8px; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.06); }
-        .imdb-config .apiCountersBar .apiCountersText { font-size: 0.85em; color: rgba(255,255,255,0.78); line-height: 1.25; }
-        .imdb-config .apiCountersBar .apiBadge { display: inline-flex; align-items: center; gap: 0.45em; padding: 0.2em 0.55em; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(0,0,0,0.20); margin-right: 0.4em; }
-        .imdb-config .apiCountersBar .apiDot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.45); }
-        .imdb-config .apiCountersBar .apiDot.omdb { background: rgba(82,196,26,0.95); }
-        .imdb-config .apiCountersBar .apiDot.mdblist { background: rgba(250,173,20,0.95); }
-        .imdb-config .apiCountersBar .apiDot.imdb { background: rgba(163,89,255,0.95); }
+        /* === Note / info boxes === */
+        .imdb-config .noteBox { background: rgba(232,124,3,0.10); border: 1px solid rgba(232,124,3,0.40); padding: 1em; border-radius: 6px; margin-bottom: 1em; color: var(--rs-text); }
+        .imdb-config .noteBox strong { color: var(--rs-orange); }
+        .imdb-config .infoBox { background: var(--rs-accent-light); border: 1px solid var(--rs-accent-border); padding: 1em; border-radius: 6px; margin-bottom: 1em; color: var(--rs-text); }
+        .imdb-config .infoBox strong { color: var(--rs-accent); }
+
+        /* === Nav tabs === */
+        .imdb-config .localnav { margin-bottom: 0.6em; display: flex; gap: 0.5em; flex-wrap: wrap; }
+        .imdb-config .nav-button {
+            padding: 0.6em 1.2em;
+            border-radius: 6px;
+            background: var(--rs-card-bg) !important;
+            border: 1px solid var(--rs-card-border) !important;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.25em;
+            min-width: 150px;
+            color: var(--rs-text) !important;
+        }
+        .imdb-config .nav-button.ui-btn-active {
+            background: var(--rs-accent) !important;
+            border-color: var(--rs-accent) !important;
+            color: #fff !important;
+        }
+        .imdb-config .navTitle { font-weight: 600; }
+        .imdb-config .navSub { font-size: 0.76em; color: var(--rs-text-muted); line-height: 1.2; }
+        .imdb-config .nav-button.ui-btn-active .navSub { color: rgba(255,255,255,0.8); }
+        .imdb-config .navSub .apiBadge { display: inline-flex; align-items: center; gap: 0.45em; padding: 0.2em 0.55em; border-radius: 999px; border: 1px solid var(--rs-card-border); background: var(--rs-input-bg); margin-right: 0.4em; }
+        .imdb-config .navSub .apiDot { width: 8px; height: 8px; border-radius: 999px; background: #aaa; }
+        .imdb-config .navSub .apiDot.omdb { background: var(--rs-green); }
+        .imdb-config .navSub .apiDot.mdblist { background: var(--rs-orange); }
+        .imdb-config .navSub .apiDot.imdb { background: var(--rs-accent); }
+
+        /* === API counters bar === */
+        .imdb-config .apiCountersBar { margin: 0 0 1.5em 0; padding: 0.65em 0.9em; border-radius: 8px; background: var(--rs-card-bg); border: 1px solid var(--rs-card-border); }
+        .imdb-config .apiCountersBar .apiCountersText { font-size: 0.85em; color: var(--rs-text-muted); line-height: 1.25; }
+        .imdb-config .apiCountersBar .apiBadge { display: inline-flex; align-items: center; gap: 0.45em; padding: 0.2em 0.55em; border-radius: 999px; border: 1px solid var(--rs-card-border); background: var(--rs-input-bg); margin-right: 0.4em; }
+        .imdb-config .apiCountersBar .apiDot { width: 8px; height: 8px; border-radius: 999px; background: #aaa; }
+        .imdb-config .apiCountersBar .apiDot.omdb { background: var(--rs-green); }
+        .imdb-config .apiCountersBar .apiDot.mdblist { background: var(--rs-orange); }
+        .imdb-config .apiCountersBar .apiDot.imdb { background: var(--rs-accent); }
+
+        /* === Tabs === */
         .imdb-config .tabPage { display: none; }
         .imdb-config .tabPage.active { display: block; }
-        
-        /* Improved Progress Section Styles */
-        .imdb-config .progressSection { margin-top: 1.5em; padding: 1.5em; background: rgba(0,0,0,0.3); border-radius: 8px; }
+
+        /* === Progress === */
+        .imdb-config .progressSection { margin-top: 1.5em; padding: 1.5em; background: rgba(0,0,0,0.25); border-radius: 8px; }
         .imdb-config .progressHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em; }
-        .imdb-config .progressBar { width: 100%; height: 28px; background: rgba(0,0,0,0.5); border-radius: 4px; overflow: hidden; margin: 0.5em 0 1em 0; position: relative; }
-        .imdb-config .progressBarFill { height: 100%; background: linear-gradient(90deg, #00a4dc 0%, #00d4dc 100%); transition: width 0.3s ease; }
+        .imdb-config .progressBar { width: 100%; height: 28px; background: rgba(0,0,0,0.35); border-radius: 4px; overflow: hidden; margin: 0.5em 0 1em 0; position: relative; }
+        .imdb-config .progressBarFill { height: 100%; background: linear-gradient(90deg, var(--rs-accent) 0%, #5195f5 100%); transition: width 0.3s ease; }
         .imdb-config .progressBarText { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.85em; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-        
-        /* Stats Grid */
+
+        /* === Stats grid === */
         .imdb-config .statsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75em; margin: 1em 0; }
         @media (max-width: 600px) { .imdb-config .statsGrid { grid-template-columns: repeat(2, 1fr); } }
-        .imdb-config .statBox { padding: 1em; background: rgba(0,0,0,0.4); border-radius: 6px; text-align: center; border-left: 3px solid #00a4dc; }
-        .imdb-config .statBox.updated { border-left-color: #52c41a; }
-        .imdb-config .statBox.skipped { border-left-color: #faad14; }
-        .imdb-config .statBox.errors { border-left-color: #f5222d; }
-        .imdb-config .statNumber { font-size: 2em; font-weight: bold; color: #fff; line-height: 1.2; }
-        .imdb-config .statLabel { font-size: 0.8em; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.05em; }
-        
-        /* Current Item Display */
-        .imdb-config .currentItemBox { margin: 1em 0; padding: 0.75em 1em; background: rgba(0,164,220,0.15); border-radius: 4px; border-left: 3px solid #00a4dc; }
-        .imdb-config .currentItemLabel { font-size: 0.75em; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25em; }
-        .imdb-config .currentItemName { font-size: 0.95em; color: #fff; word-break: break-word; }
-        
-        /* ETA Display */
-        .imdb-config .etaBox { display: inline-flex; align-items: center; gap: 0.5em; padding: 0.4em 0.8em; background: rgba(0,0,0,0.3); border-radius: 4px; font-size: 0.85em; color: rgba(255,255,255,0.7); }
+        .imdb-config .statBox { padding: 1em; background: var(--rs-card-bg); border: 1px solid var(--rs-card-border); border-left: 3px solid var(--rs-accent); border-radius: 6px; text-align: center; color: var(--rs-text); }
+        .imdb-config .statBox.updated { border-left-color: var(--rs-green); }
+        .imdb-config .statBox.skipped { border-left-color: var(--rs-orange); }
+        .imdb-config .statBox.errors { border-left-color: var(--rs-red); }
+        .imdb-config .statNumber { font-size: 2em; font-weight: bold; color: var(--rs-text); line-height: 1.2; }
+        .imdb-config .statLabel { font-size: 0.8em; color: var(--rs-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+        /* === Current item / ETA / status === */
+        .imdb-config .currentItemBox { margin: 1em 0; padding: 0.75em 1em; background: var(--rs-accent-light); border-left: 3px solid var(--rs-accent); border-radius: 4px; }
+        .imdb-config .currentItemLabel { font-size: 0.75em; color: var(--rs-text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25em; }
+        .imdb-config .currentItemName { font-size: 0.95em; color: var(--rs-text); word-break: break-word; }
+        .imdb-config .etaBox { display: inline-flex; align-items: center; gap: 0.5em; padding: 0.4em 0.8em; background: rgba(0,0,0,0.25); border-radius: 4px; font-size: 0.85em; color: rgba(255,255,255,0.7); }
         .imdb-config .etaLabel { color: rgba(255,255,255,0.5); }
-        
-        /* Status Badge */
         .imdb-config .statusBadge { display: inline-flex; align-items: center; gap: 0.5em; padding: 0.4em 0.8em; border-radius: 20px; font-size: 0.85em; font-weight: 500; }
-        .imdb-config .statusBadge.idle { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
-        .imdb-config .statusBadge.running { background: rgba(0,164,220,0.3); color: #00d4dc; }
-        .imdb-config .statusBadge.completed { background: rgba(82,196,26,0.3); color: #52c41a; }
-        .imdb-config .statusBadge.error { background: rgba(245,34,45,0.3); color: #f5222d; }
+        .imdb-config .statusBadge.idle { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.75); }
+        .imdb-config .statusBadge.running { background: var(--rs-accent-light); border: 1px solid var(--rs-accent-border); color: var(--rs-accent); }
+        .imdb-config .statusBadge.completed { background: rgba(45,158,90,0.15); border: 1px solid rgba(45,158,90,0.35); color: var(--rs-green); }
+        .imdb-config .statusBadge.error { background: rgba(217,48,37,0.15); border: 1px solid rgba(217,48,37,0.35); color: var(--rs-red); }
         .imdb-config .statusDot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-        .imdb-config .statusBadge.running .statusDot { animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        
-        /* Result Lists */
+        .imdb-config .statusBadge.running .statusDot { animation: rspulse 1.5s infinite; }
+        @keyframes rspulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* === Result lists === */
         .imdb-config .resultSection { margin-top: 1.5em; }
         .imdb-config .resultTabs { display: flex; gap: 0.5em; margin-bottom: 0; }
-        .imdb-config .resultTab { padding: 0.5em 1em; background: rgba(255,255,255,0.1); border-radius: 4px 4px 0 0; cursor: pointer; font-size: 0.85em; border: none; color: rgba(255,255,255,0.7); }
-        .imdb-config .resultTab.active { background: rgba(0,0,0,0.4); color: #fff; }
+        .imdb-config .resultTab { padding: 0.5em 1em; background: var(--rs-card-bg); border: 1px solid var(--rs-card-border); border-bottom: none; border-radius: 4px 4px 0 0; cursor: pointer; font-size: 0.85em; color: var(--rs-text-muted); }
+        .imdb-config .resultTab.active { background: var(--rs-input-bg); color: var(--rs-text); }
         .imdb-config .resultTab .badge { display: inline-block; padding: 0.15em 0.5em; border-radius: 10px; font-size: 0.85em; margin-left: 0.5em; }
-        .imdb-config .resultTab.success .badge { background: rgba(82,196,26,0.3); color: #52c41a; }
-        .imdb-config .resultTab.skipped .badge { background: rgba(250,173,20,0.3); color: #faad14; }
-        .imdb-config .resultTab.failure .badge { background: rgba(245,34,45,0.3); color: #f5222d; }
-        
-        .imdb-config .resultContainer { max-height: 350px; overflow-y: auto; background: rgba(0,0,0,0.4); border-radius: 0 6px 6px 6px; }
+        .imdb-config .resultTab.success .badge { background: rgba(45,158,90,0.15); color: var(--rs-green); }
+        .imdb-config .resultTab.skipped .badge { background: rgba(232,124,3,0.15); color: var(--rs-orange); }
+        .imdb-config .resultTab.failure .badge { background: rgba(217,48,37,0.15); color: var(--rs-red); }
+        .imdb-config .resultContainer { max-height: 350px; overflow-y: auto; background: var(--rs-input-bg); border: 1px solid var(--rs-card-border); border-radius: 0 6px 6px 6px; }
         .imdb-config .resultList { padding: 0; margin: 0; list-style: none; }
-        .imdb-config .resultItem { padding: 0.75em 1em; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: flex-start; gap: 1em; }
+        .imdb-config .resultItem { padding: 0.75em 1em; border-bottom: 1px solid var(--rs-card-border); display: flex; justify-content: space-between; align-items: flex-start; gap: 1em; }
         .imdb-config .resultItem:last-child { border-bottom: none; }
-        .imdb-config .resultItem:hover { background: rgba(255,255,255,0.03); }
-        .imdb-config .resultItemName { flex: 1; font-size: 0.9em; word-break: break-word; }
-        .imdb-config .resultItemDetail { font-size: 0.85em; color: rgba(255,255,255,0.5); max-width: 50%; text-align: right; }
-        .imdb-config .resultItem.success .resultItemDetail { color: #52c41a; }
-        .imdb-config .resultItem.skipped .resultItemDetail { color: #faad14; }
-        .imdb-config .resultItem.failure .resultItemDetail { color: #f5222d; }
-        
-        .imdb-config .resultEmpty { padding: 2em; text-align: center; color: rgba(255,255,255,0.4); font-style: italic; }
-        
-        /* Library Selection */
+        .imdb-config .resultItem:hover { background: var(--rs-card-bg); }
+        .imdb-config .resultItemName { flex: 1; font-size: 0.9em; word-break: break-word; color: var(--rs-text); }
+        .imdb-config .resultItemDetail { font-size: 0.85em; color: var(--rs-text-muted); max-width: 50%; text-align: right; }
+        .imdb-config .resultItem.success .resultItemDetail { color: var(--rs-green); }
+        .imdb-config .resultItem.skipped .resultItemDetail { color: var(--rs-orange); }
+        .imdb-config .resultItem.failure .resultItemDetail { color: var(--rs-red); }
+        .imdb-config .resultEmpty { padding: 2em; text-align: center; color: var(--rs-text-muted); font-style: italic; }
+
+        /* === Library selection === */
         .imdb-config .selectionGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1em; margin-bottom: 1.5em; }
         @media (max-width: 600px) { .imdb-config .selectionGrid { grid-template-columns: 1fr; } }
-        .imdb-config .selectionBox { padding: 1em; background: rgba(0,0,0,0.2); border-radius: 6px; }
-        .imdb-config .selectionBox h4 { margin: 0 0 0.75em 0; font-size: 0.9em; color: rgba(255,255,255,0.7); }
-        
-        /* Buttons */
+        .imdb-config .selectionBox { padding: 1em; background: var(--rs-card-bg); border: 1px solid var(--rs-card-border); border-radius: 6px; color: var(--rs-text); }
+        .imdb-config .selectionBox h4 { margin: 0 0 0.75em 0; font-size: 0.9em; color: var(--rs-text-muted); }
+
+        /* === Buttons === */
         .imdb-config .buttonGroup { display: flex; gap: 0.5em; flex-wrap: wrap; margin: 0.5em 0 1.5em 0; }
-        .imdb-config .btn-primary { background: #00a4dc !important; }
-        .imdb-config .btn-danger { background: #f5222d !important; }
-        .imdb-config .btn-secondary { background: rgba(255,255,255,0.1) !important; }
-        
-        /* History Page Styles */
+        .imdb-config .btn-primary { background: var(--rs-accent) !important; }
+        .imdb-config .btn-danger { background: var(--rs-red) !important; }
+        .imdb-config .btn-secondary { background: var(--rs-card-bg) !important; color: var(--rs-text) !important; border: 1px solid var(--rs-card-border) !important; }
+
+        /* === History === */
         .imdb-config .historySection { margin-bottom: 1.5em; }
-        .imdb-config .historySection h3 { margin: 0 0 1em 0; font-size: 1.1em; color: rgba(255,255,255,0.9); border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5em; }
-        
+        .imdb-config .historySection h3 { margin: 0 0 1em 0; font-size: 1.1em; color: rgba(255,255,255,0.9); border-bottom: 1px solid rgba(255,255,255,0.10); padding-bottom: 0.5em; }
         .imdb-config .sessionList { max-height: 400px; overflow-y: auto; }
-        .imdb-config .sessionCard { padding: 1em; background: rgba(0,0,0,0.3); border-radius: 6px; margin-bottom: 0.75em; border-left: 3px solid #00a4dc; cursor: pointer; }
-        .imdb-config .sessionCard.cancelled { border-left-color: #faad14; }
-        .imdb-config .sessionCard.hasErrors { border-left-color: #f5222d; }
-        .imdb-config .sessionCard:hover { background: rgba(0,0,0,0.38); }
+        .imdb-config .sessionCard { padding: 1em; background: var(--rs-card-bg); border: 1px solid var(--rs-card-border); border-left: 3px solid var(--rs-accent); border-radius: 6px; margin-bottom: 0.75em; cursor: pointer; color: var(--rs-text); }
+        .imdb-config .sessionCard.cancelled { border-left-color: var(--rs-orange); }
+        .imdb-config .sessionCard.hasErrors { border-left-color: var(--rs-red); }
+        .imdb-config .sessionCard:hover { background: var(--rs-input-bg); }
         .imdb-config .sessionHeader { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75em; margin-bottom: 0.5em; }
         .imdb-config .sessionHeaderLeft { flex: 1; min-width: 0; }
         .imdb-config .sessionHeaderRight { display: flex; align-items: center; gap: 0.6em; flex: 0 0 auto; }
-        .imdb-config .sessionDate { font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .imdb-config .sessionDuration { font-size: 0.85em; color: rgba(255,255,255,0.55); white-space: nowrap; }
-        .imdb-config .sessionDeleteBtn { font-size: 0.78em; padding: 0.2em 0.55em; line-height: 1.2; border-radius: 999px; border: 1px solid rgba(245,34,45,0.35); background: rgba(245,34,45,0.10); color: rgba(255,255,255,0.85); cursor: pointer; }
-        .imdb-config .sessionDeleteBtn:hover { background: rgba(245,34,45,0.18); }
-        .imdb-config .sessionDeleteBtn:focus { outline: none; box-shadow: 0 0 0 3px rgba(245,34,45,0.15); }
+        .imdb-config .sessionDate { font-weight: 500; color: var(--rs-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .imdb-config .sessionDuration { font-size: 0.85em; color: var(--rs-text-muted); white-space: nowrap; }
+        .imdb-config .sessionDeleteBtn { font-size: 0.78em; padding: 0.2em 0.55em; line-height: 1.2; border-radius: 999px; border: 1px solid rgba(217,48,37,0.35); background: rgba(217,48,37,0.08); color: var(--rs-text); cursor: pointer; }
+        .imdb-config .sessionDeleteBtn:hover { background: rgba(217,48,37,0.15); }
+        .imdb-config .sessionDeleteBtn:focus { outline: none; box-shadow: 0 0 0 3px rgba(217,48,37,0.15); }
         .imdb-config .sessionStats { display: flex; gap: 1.5em; flex-wrap: wrap; }
         .imdb-config .sessionStat { font-size: 0.85em; }
-        .imdb-config .sessionStat .label { color: rgba(255,255,255,0.5); }
-        .imdb-config .sessionStat .value { color: #fff; font-weight: 500; }
-        .imdb-config .sessionStat.updated .value { color: #52c41a; }
-        .imdb-config .sessionStat.skipped .value { color: #faad14; }
-        .imdb-config .sessionStat.errors .value { color: #f5222d; }
-        .imdb-config .sessionCta { margin-top: 0.75em; display: flex; justify-content: flex-end; font-size: 0.85em; color: rgba(255,255,255,0.45); }
-        .imdb-config .sessionCta span { color: rgba(0,212,220,0.9); }
-        .imdb-config .sessionCta .arrow { margin-left: 0.25em; opacity: 0.9; }
+        .imdb-config .sessionStat .label { color: var(--rs-text-muted); }
+        .imdb-config .sessionStat .value { color: var(--rs-text); font-weight: 500; }
+        .imdb-config .sessionStat.updated .value { color: var(--rs-green); }
+        .imdb-config .sessionStat.skipped .value { color: var(--rs-orange); }
+        .imdb-config .sessionStat.errors .value { color: var(--rs-red); }
+        .imdb-config .sessionCta { margin-top: 0.75em; display: flex; justify-content: flex-end; font-size: 0.85em; color: var(--rs-text-muted); }
+        .imdb-config .sessionCta span { color: var(--rs-accent); }
+        .imdb-config .sessionCta .arrow { margin-left: 0.25em; }
 
-        /* Scan report modal */
+        /* === Scan report modal === */
         .imdb-config .rs-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
         .imdb-config .rs-modal.hide { display: none !important; }
-        .imdb-config .rs-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.65); }
-        .imdb-config .rs-modal-content { position: relative; width: min(980px, calc(100vw - 2.5em)); max-height: calc(100vh - 2.5em); background: rgba(20, 24, 28, 0.98); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; box-shadow: 0 16px 50px rgba(0,0,0,0.6); }
-        .imdb-config .rs-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: 1em 1.2em; border-bottom: 1px solid rgba(255,255,255,0.08); }
-        .imdb-config .rs-modal-title { margin: 0; font-size: 1.1em; color: #fff; }
+        .imdb-config .rs-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); }
+        .imdb-config .rs-modal-content { position: relative; width: min(980px, calc(100vw - 2.5em)); max-height: calc(100vh - 2.5em); background: var(--rs-input-bg); border: 1px solid var(--rs-card-border); border-radius: 10px; overflow: hidden; box-shadow: 0 16px 50px rgba(0,0,0,0.2); color: var(--rs-text); }
+        .imdb-config .rs-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: 1em 1.2em; border-bottom: 1px solid var(--rs-card-border); }
+        .imdb-config .rs-modal-title { margin: 0; font-size: 1.1em; color: var(--rs-text); }
         .imdb-config .rs-modal-actions { display: flex; gap: 0.5em; flex-wrap: wrap; }
         .imdb-config .rs-modal-body { padding: 1em 1.2em; overflow: auto; max-height: calc(100vh - 8em); }
         .imdb-config .reportMeta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75em; margin-bottom: 1em; }
         @media (max-width: 700px) { .imdb-config .reportMeta { grid-template-columns: 1fr; } }
-        .imdb-config .reportMetaBox { padding: 0.85em; background: rgba(0,0,0,0.35); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); position: relative; overflow: hidden; }
-        .imdb-config .reportMetaBox::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: rgba(0,212,220,0.55); }
-        .imdb-config .reportMetaBox.tone-updated::before { background: rgba(82,196,26,0.95); }
-        .imdb-config .reportMetaBox.tone-skipped::before { background: rgba(250,173,20,0.95); }
-        .imdb-config .reportMetaBox.tone-errors::before { background: rgba(245,34,45,0.95); }
-        .imdb-config .reportMetaBox.tone-status::before { background: rgba(163,89,255,0.90); }
-        .imdb-config .reportMetaBox.tone-time::before { background: rgba(0,212,220,0.75); }
-        .imdb-config .reportMetaLabel { font-size: 0.75em; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 0.35em; }
-        .imdb-config .reportMetaValue { font-size: 0.95em; color: rgba(255,255,255,0.9); word-break: break-word; }
+        .imdb-config .reportMetaBox { padding: 0.85em; background: var(--rs-card-bg); border-radius: 8px; border: 1px solid var(--rs-card-border); position: relative; overflow: hidden; }
+        .imdb-config .reportMetaBox::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--rs-accent); }
+        .imdb-config .reportMetaBox.tone-updated::before { background: var(--rs-green); }
+        .imdb-config .reportMetaBox.tone-skipped::before { background: var(--rs-orange); }
+        .imdb-config .reportMetaBox.tone-errors::before { background: var(--rs-red); }
+        .imdb-config .reportMetaBox.tone-status::before { background: #7c4dff; }
+        .imdb-config .reportMetaBox.tone-time::before { background: var(--rs-accent); }
+        .imdb-config .reportMetaLabel { font-size: 0.75em; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rs-text-muted); margin-bottom: 0.35em; }
+        .imdb-config .reportMetaValue { font-size: 0.95em; color: var(--rs-text); word-break: break-word; }
         .imdb-config .reportSection { margin-top: 1.25em; }
-        .imdb-config .reportSection h4 { margin: 0 0 0.5em 0; font-size: 0.95em; color: rgba(255,255,255,0.85); }
+        .imdb-config .reportSection h4 { margin: 0 0 0.5em 0; font-size: 0.95em; color: var(--rs-text); }
         .imdb-config .reportH { display: flex; align-items: center; gap: 0.55em; }
-        .imdb-config .reportH::before { content: ''; width: 10px; height: 10px; border-radius: 999px; background: rgba(0,212,220,0.75); box-shadow: 0 0 0 3px rgba(0,212,220,0.12); }
-        .imdb-config .reportH.tone-updated::before { background: rgba(82,196,26,0.95); box-shadow: 0 0 0 3px rgba(82,196,26,0.12); }
-        .imdb-config .reportH.tone-skipped::before { background: rgba(250,173,20,0.95); box-shadow: 0 0 0 3px rgba(250,173,20,0.12); }
-        .imdb-config .reportH.tone-errors::before { background: rgba(245,34,45,0.95); box-shadow: 0 0 0 3px rgba(245,34,45,0.12); }
-
-        .imdb-config .reportChip { display: inline-flex; gap: 0.5em; align-items: center; padding: 0.35em 0.75em; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.88); font-size: 0.9em; }
+        .imdb-config .reportH::before { content: ''; width: 10px; height: 10px; border-radius: 999px; background: var(--rs-accent); box-shadow: 0 0 0 3px var(--rs-accent-light); }
+        .imdb-config .reportH.tone-updated::before { background: var(--rs-green); box-shadow: 0 0 0 3px rgba(45,158,90,0.12); }
+        .imdb-config .reportH.tone-skipped::before { background: var(--rs-orange); box-shadow: 0 0 0 3px rgba(232,124,3,0.12); }
+        .imdb-config .reportH.tone-errors::before { background: var(--rs-red); box-shadow: 0 0 0 3px rgba(217,48,37,0.12); }
+        .imdb-config .reportChip { display: inline-flex; gap: 0.5em; align-items: center; padding: 0.35em 0.75em; border-radius: 999px; border: 1px solid var(--rs-card-border); background: var(--rs-card-bg); color: var(--rs-text); font-size: 0.9em; }
         .imdb-config .reportChipCount { opacity: 0.85; font-variant-numeric: tabular-nums; }
         .imdb-config .reportChipText { opacity: 0.95; }
-        .imdb-config .reportChip.tone-updated { border-color: rgba(82,196,26,0.35); background: rgba(82,196,26,0.10); }
-        .imdb-config .reportChip.tone-skipped { border-color: rgba(250,173,20,0.35); background: rgba(250,173,20,0.10); }
-        .imdb-config .reportChip.tone-errors { border-color: rgba(245,34,45,0.35); background: rgba(245,34,45,0.10); }
-        .imdb-config .reportChip.tone-neutral { border-color: rgba(0,212,220,0.25); background: rgba(0,212,220,0.06); }
-        .imdb-config .reportNote { font-size: 0.85em; color: rgba(255,255,255,0.55); margin: 0.25em 0 0.75em 0; }
-
+        .imdb-config .reportChip.tone-updated { border-color: rgba(45,158,90,0.35); background: rgba(45,158,90,0.10); color: var(--rs-green); }
+        .imdb-config .reportChip.tone-skipped { border-color: rgba(232,124,3,0.35); background: rgba(232,124,3,0.10); color: var(--rs-orange); }
+        .imdb-config .reportChip.tone-errors { border-color: rgba(217,48,37,0.35); background: rgba(217,48,37,0.10); color: var(--rs-red); }
+        .imdb-config .reportChip.tone-neutral { border-color: var(--rs-accent-border); background: var(--rs-accent-light); color: var(--rs-accent); }
+        .imdb-config .reportNote { font-size: 0.85em; color: var(--rs-text-muted); margin: 0.25em 0 0.75em 0; }
         .imdb-config .reportFilterRow { display: flex; gap: 0.75em; align-items: center; flex-wrap: wrap; margin: 0.25em 0 1em 0; }
-        .imdb-config .reportFilterRow input { flex: 1; min-width: 240px; padding: 0.6em 0.75em; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.35); color: rgba(255,255,255,0.9); }
-        .imdb-config .reportFilterHint { font-size: 0.85em; color: rgba(255,255,255,0.5); }
-
-        .imdb-config details.reportDetails { border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; overflow: hidden; background: rgba(0,0,0,0.18); }
+        .imdb-config .reportFilterRow input { flex: 1; min-width: 240px; padding: 0.6em 0.75em; border-radius: var(--rs-radius-input); border: 1px solid var(--rs-input-border); background: var(--rs-input-bg); color: var(--rs-text); }
+        .imdb-config .reportFilterHint { font-size: 0.85em; color: var(--rs-text-muted); }
+        .imdb-config details.reportDetails { border: 1px solid var(--rs-card-border); border-radius: 6px; overflow: hidden; background: var(--rs-card-bg); }
         .imdb-config details.reportDetails + details.reportDetails { margin-top: 0.8em; }
         .imdb-config details.reportDetails summary { cursor: pointer; padding: 0.85em 0.95em; list-style: none; display: flex; justify-content: space-between; gap: 1em; align-items: center; }
         .imdb-config details.reportDetails summary::-webkit-details-marker { display: none; }
-        .imdb-config .reportSummaryTitle { font-size: 0.95em; color: rgba(255,255,255,0.88); }
-        .imdb-config .reportSummaryMeta { font-size: 0.85em; color: rgba(255,255,255,0.55); }
+        .imdb-config .reportSummaryTitle { font-size: 0.95em; color: var(--rs-text); }
+        .imdb-config .reportSummaryMeta { font-size: 0.85em; color: var(--rs-text-muted); }
         .imdb-config .reportSummaryActions { display: flex; gap: 0.5em; }
-        .imdb-config .reportSmallBtn { padding: 0.35em 0.7em; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8); cursor: pointer; font-size: 0.85em; }
-        .imdb-config .reportSmallBtn:hover { background: rgba(255,255,255,0.10); }
+        .imdb-config .reportSmallBtn { padding: 0.35em 0.7em; border-radius: 999px; border: 1px solid var(--rs-card-border); background: var(--rs-input-bg); color: var(--rs-text); cursor: pointer; font-size: 0.85em; }
+        .imdb-config .reportSmallBtn:hover { background: var(--rs-card-bg); }
         .imdb-config .reportDetailsBody { padding: 0 0.95em 0.95em 0.95em; }
-        .imdb-config .reportList { list-style: none; padding: 0; margin: 0; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; overflow: hidden; }
-        .imdb-config .reportListItem { padding: 0.75em 0.9em; background: rgba(0,0,0,0.25); border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; gap: 1em; }
+        .imdb-config .reportList { list-style: none; padding: 0; margin: 0; border: 1px solid var(--rs-card-border); border-radius: 6px; overflow: hidden; }
+        .imdb-config .reportListItem { padding: 0.75em 0.9em; background: var(--rs-input-bg); border-bottom: 1px solid var(--rs-card-border); display: flex; justify-content: space-between; gap: 1em; }
         .imdb-config .reportListItem:last-child { border-bottom: none; }
-        .imdb-config .reportItemName { color: rgba(255,255,255,0.92); flex: 1; }
-        .imdb-config .reportItemDetail { color: rgba(255,255,255,0.55); text-align: right; max-width: 55%; }
-        .imdb-config .reportListItem.updated .reportItemDetail { color: rgba(82,196,26,0.9); }
-        .imdb-config .reportListItem.skipped .reportItemDetail { color: rgba(250,173,20,0.95); }
-        .imdb-config .reportListItem.failure .reportItemDetail { color: rgba(245,34,45,0.95); }
-        
-        .imdb-config .tableContainer { max-height: 400px; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 6px; position: relative; }
+        .imdb-config .reportItemName { color: var(--rs-text); flex: 1; }
+        .imdb-config .reportItemDetail { color: var(--rs-text-muted); text-align: right; max-width: 55%; }
+        .imdb-config .reportListItem.updated .reportItemDetail { color: var(--rs-green); }
+        .imdb-config .reportListItem.skipped .reportItemDetail { color: var(--rs-orange); }
+        .imdb-config .reportListItem.failure .reportItemDetail { color: var(--rs-red); }
+
+        /* === Data table === */
+        .imdb-config .tableContainer { max-height: 400px; overflow-y: auto; background: var(--rs-input-bg); border: 1px solid var(--rs-card-border); border-radius: 6px; position: relative; }
         .imdb-config .dataTable { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-        .imdb-config .dataTable th { text-align: left; padding: 0.75em 1em; background: rgba(0,0,0,0.85); color: rgba(255,255,255,0.8); font-weight: 500; position: sticky; top: 0; z-index: 5; border-bottom: 1px solid rgba(255,255,255,0.08); }
-        .imdb-config .dataTable td { padding: 0.6em 1em; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .imdb-config .dataTable tr:hover td { background: rgba(255,255,255,0.03); }
-        .imdb-config .dataTable tr.selected td { background: rgba(0,164,220,0.15); }
-        .imdb-config .dataTable .type-badge { display: inline-block; padding: 0.15em 0.5em; border-radius: 3px; font-size: 0.8em; background: rgba(0,164,220,0.3); color: #00a4dc; }
-        .imdb-config .dataTable .type-badge.movie { background: rgba(156,39,176,0.3); color: #ce93d8; }
-        .imdb-config .dataTable .type-badge.series { background: rgba(0,150,136,0.3); color: #80cbc4; }
-        .imdb-config .dataTable .type-badge.episode { background: rgba(255,152,0,0.3); color: #ffcc80; }
-        .imdb-config .dataTable .missing { color: #f5222d; }
-        .imdb-config .dataTable .present { color: #52c41a; }
-        .imdb-config .emptyText { padding: 2em; text-align: center; color: rgba(255,255,255,0.4); font-style: italic; }
-        .imdb-config .loadingText { padding: 2em; text-align: center; color: rgba(255,255,255,0.5); }
-        
-        .imdb-config .hide { display: none !important; }
+        .imdb-config .dataTable th { text-align: left; padding: 0.75em 1em; background: var(--rs-card-bg); color: var(--rs-text-muted); font-weight: 600; position: sticky; top: 0; z-index: 5; border-bottom: 1px solid var(--rs-card-border); }
+        .imdb-config .dataTable td { padding: 0.6em 1em; border-bottom: 1px solid var(--rs-card-border); color: var(--rs-text); }
+        .imdb-config .dataTable tr:hover td { background: var(--rs-card-bg); }
+        .imdb-config .dataTable tr.selected td { background: var(--rs-accent-light); }
+        .imdb-config .dataTable .type-badge { display: inline-block; padding: 0.15em 0.5em; border-radius: 3px; font-size: 0.8em; background: var(--rs-accent-light); color: var(--rs-accent); }
+        .imdb-config .dataTable .type-badge.movie { background: rgba(124,77,255,0.12); color: #7c4dff; }
+        .imdb-config .dataTable .type-badge.series { background: rgba(0,150,136,0.12); color: #00897b; }
+        .imdb-config .dataTable .type-badge.episode { background: rgba(232,124,3,0.12); color: var(--rs-orange); }
+        .imdb-config .dataTable .missing { color: var(--rs-red); }
+        .imdb-config .dataTable .present { color: var(--rs-green); }
+        .imdb-config .emptyText { padding: 2em; text-align: center; color: var(--rs-text-muted); font-style: italic; }
+        .imdb-config .loadingText { padding: 2em; text-align: center; color: var(--rs-text-muted); }
     </style>
 
     <div class="scrollSlider flex-direction-column padded-left padded-left-page padded-right padded-top-page padded-bottom-page">
@@ -258,9 +385,10 @@
             <!-- Settings Tab -->
             <div id="settingsPage" class="tabPage active">
                 <form class="imdbRefreshConfigForm">
+                    <!-- Section 1: API Setup -->
                     <div class="settingsSection">
-                        <h2 class="sectionTitle">Sources</h2>
-                        <p class="settingsIntro">Connect rating providers and choose how Rating Sync fills community and critic ratings.</p>
+                        <h2 class="sectionTitle">API Setup</h2>
+                        <p class="settingsIntro">Configure API keys, mode, and daily request budgets.</p>
 
                         <div class="settingsGrid">
                             <div class="settingsCard">
@@ -284,7 +412,7 @@
                             </div>
 
                             <div class="settingsCard">
-                                <h3 class="subsectionTitle">Rating Sources</h3>
+                                <h3 class="subsectionTitle">API Mode</h3>
                                 <div class="selectContainer">
                                     <label class="selectLabel" for="selectApiMode">API Mode</label>
                                     <select id="selectApiMode" is="emby-select">
@@ -298,74 +426,19 @@
                                 </div>
 
                                 <label class="checkboxContainer">
-                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateCriticRating" />
-                                    <span>Enable Rotten Tomatoes Critic Rating (Tomatometer)</span>
-                                </label>
-                                <div class="compactDescription">Writes Rotten Tomatoes Tomatometer scores to Emby's Critic Rating field.</div>
-
-                                <label class="checkboxContainer">
                                     <input type="checkbox" is="emby-checkbox" id="chkUpdateCommunityRating" />
-                                    <span>Enable Community Ratings</span>
+                                    <span>Enable Community Rating updates</span>
                                 </label>
-                                <div class="compactDescription">Updates Emby's Community Rating for movies and series.</div>
 
-                                <div class="selectContainer">
-                                    <label class="selectLabel" for="selectCommunityRatingSource">Community Metric (Movies & TV Series)</label>
-                                    <select id="selectCommunityRatingSource" is="emby-select">
-                                        <option value="IMDb">IMDb</option>
-                                        <option value="Popcorn">Rotten Tomatoes Audience (Popcorn)</option>
-                                    </select>
-                                    <div class="fieldDescription">Episodes always use IMDb. Popcorn requires MDBList.</div>
-                                    <div class="fieldDescription compatMessage" id="communitySourceCompatMessage">Popcorn requires MDBList. API Mode was adjusted to include MDBList.</div>
-                                </div>
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateCriticRating" />
+                                    <span>Enable Critic Rating updates</span>
+                                </label>
+                                <div class="fieldDescription compatMessage" id="communitySourceCompatMessage">This source requires MDBList. API Mode was adjusted to include MDBList.</div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="settingsSection">
-                        <h2 class="sectionTitle">Content</h2>
-                        <p class="settingsIntro">Choose which library items are eligible for rating updates.</p>
-
-                        <div class="settingsGrid">
-                            <div class="settingsCard">
-                                <h3 class="subsectionTitle">Item Types</h3>
-                                <label class="checkboxContainer">
-                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateMovies" />
-                                    <span>Movies</span>
-                                </label>
-
-                                <label class="checkboxContainer">
-                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateSeries" />
-                                    <span>TV Series</span>
-                                </label>
-
-                                <label class="checkboxContainer">
-                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateEpisodes" />
-                                    <span>TV Episodes</span>
-                                </label>
-                                <div class="compactDescription">Episodes use OMDb first; optional IMDb fallback can fill gaps.</div>
-                            </div>
-
-                            <div class="settingsCard">
-                                <h3 class="subsectionTitle">Episode Fallback</h3>
-                                <label class="checkboxContainer">
-                                    <input type="checkbox" is="emby-checkbox" id="chkEnableImdbScraping" />
-                                    <span>Enable IMDb episode fallback</span>
-                                </label>
-                                <div class="compactDescription">When OMDb has no episode rating, Rating Sync can try IMDb-specific sources.</div>
-
-                                <div class="noteBox">
-                                    <strong>Use sparingly:</strong> IMDb fallback can make direct IMDb-side requests. A conservative daily limit helps avoid temporary blocks.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="settingsSection">
-                        <h2 class="sectionTitle">Limits</h2>
-                        <p class="settingsIntro">Set daily request budgets to match your provider tiers.</p>
-
-                        <div class="settingsGrid threeColumn">
+                        <div class="settingsGrid threeColumn" style="margin-top: 1em;">
                             <div class="settingsCard">
                                 <h3 class="subsectionTitle">OMDb API</h3>
                                 <label class="checkboxContainer">
@@ -408,11 +481,112 @@
                         </div>
                     </div>
 
+                    <!-- Section 2: Rating Sources -->
                     <div class="settingsSection">
-                        <h2 class="sectionTitle">Scanning</h2>
-                        <p class="settingsIntro">Avoid repeated work and prioritize new media.</p>
+                        <h2 class="sectionTitle">Rating Sources</h2>
+                        <p class="settingsIntro">Choose which sources fill community and critic ratings for each content type.</p>
 
                         <div class="settingsGrid">
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">Community Rating Source</h3>
+                                <div class="selectContainer">
+                                    <label class="selectLabel" for="selectMoviesRatingSource">Movies</label>
+                                    <select id="selectMoviesRatingSource" is="emby-select">
+                                        <option value="IMDb">IMDb</option>
+                                        <option value="Popcorn">RT Audience (Popcorn)</option>
+                                        <option value="Metacritic">Metacritic (Critic)</option>
+                                        <option value="MetacriticUser">Metacritic (User)</option>
+                                        <option value="MdbList">MDBList Score</option>
+                                        <option value="Trakt">Trakt</option>
+                                        <option value="Tmdb">TMDb</option>
+                                        <option value="Letterboxd">Letterboxd</option>
+                                        <option value="RogerEbert">Roger Ebert</option>
+                                    </select>
+                                </div>
+                                <div class="selectContainer">
+                                    <label class="selectLabel" for="selectSeriesRatingSource">TV Series</label>
+                                    <select id="selectSeriesRatingSource" is="emby-select">
+                                        <option value="IMDb">IMDb</option>
+                                        <option value="Popcorn">RT Audience (Popcorn)</option>
+                                        <option value="Metacritic">Metacritic (Critic)</option>
+                                        <option value="MetacriticUser">Metacritic (User)</option>
+                                        <option value="MdbList">MDBList Score</option>
+                                        <option value="Trakt">Trakt</option>
+                                        <option value="Tmdb">TMDb</option>
+                                        <option value="Letterboxd">Letterboxd</option>
+                                        <option value="RogerEbert">Roger Ebert</option>
+                                    </select>
+                                </div>
+                                <div class="fieldDescription">Episodes always use IMDb. All sources except IMDb require MDBList.</div>
+                            </div>
+
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">Critic Rating Source</h3>
+                                <div class="selectContainer">
+                                    <label class="selectLabel" for="selectMoviesCriticRatingSource">Movies</label>
+                                    <select id="selectMoviesCriticRatingSource" is="emby-select">
+                                        <option value="RottenTomatoes">RT Tomatometer</option>
+                                        <option value="Metacritic">Metacritic</option>
+                                        <option value="RottenTomatoesWithMetacriticFallback">RT, then Metacritic</option>
+                                        <option value="MetacriticWithRottenTomatoesFallback">Metacritic, then RT</option>
+                                        <option value="None">None</option>
+                                    </select>
+                                </div>
+                                <div class="selectContainer">
+                                    <label class="selectLabel" for="selectSeriesCriticRatingSource">TV Series</label>
+                                    <select id="selectSeriesCriticRatingSource" is="emby-select">
+                                        <option value="RottenTomatoes">RT Tomatometer</option>
+                                        <option value="Metacritic">Metacritic</option>
+                                        <option value="RottenTomatoesWithMetacriticFallback">RT, then Metacritic</option>
+                                        <option value="MetacriticWithRottenTomatoesFallback">Metacritic, then RT</option>
+                                        <option value="None">None</option>
+                                    </select>
+                                </div>
+                                <div class="fieldDescription">Writes to Emby's Critic Rating field. Requires Critic Rating updates enabled above.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Content -->
+                    <div class="settingsSection">
+                        <h2 class="sectionTitle">Content</h2>
+                        <p class="settingsIntro">Choose which library items are eligible for rating updates and how scanning behaves.</p>
+
+                        <div class="settingsGrid">
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">Item Types</h3>
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateMovies" />
+                                    <span>Movies</span>
+                                </label>
+
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateSeries" />
+                                    <span>TV Series</span>
+                                </label>
+
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateEpisodes" />
+                                    <span>TV Episodes</span>
+                                </label>
+                                <div class="compactDescription">Episodes use OMDb first; optional IMDb fallback can fill gaps.</div>
+                            </div>
+
+                            <div class="settingsCard">
+                                <h3 class="subsectionTitle">Episode Fallback</h3>
+                                <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkEnableImdbScraping" />
+                                    <span>Enable IMDb episode fallback</span>
+                                </label>
+                                <div class="compactDescription">When OMDb has no episode rating, Rating Sync can try IMDb-specific sources.</div>
+
+                                <div class="noteBox">
+                                    <strong>Use sparingly:</strong> IMDb fallback can make direct IMDb-side requests. A conservative daily limit helps avoid temporary blocks.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settingsGrid" style="margin-top: 1em;">
                             <div class="settingsCard">
                                 <h3 class="subsectionTitle">Smart Scanning</h3>
                                 <div class="inputContainer">
@@ -619,7 +793,7 @@
                     </div>
                 </div>
 
-                <div class="verticalSection" style="margin-top: 2em; padding-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.1);">
+                <div class="verticalSection" style="margin-top: 2em; padding-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.12);">
                     <h3>Scheduled Task</h3>
                     <p>This task also runs automatically every day at 3:00 AM. You can view or modify the schedule in <strong>Scheduled Tasks</strong> under server settings.</p>
                 </div>

@@ -478,25 +478,27 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
         enforceCommunityApiCompatibility(view, options) {
             var opts = options || {};
             var selectApiMode = view.querySelector('#selectApiMode');
-            var selectCommunity = view.querySelector('#selectCommunityRatingSource');
             var compatMsg = view.querySelector('#communitySourceCompatMessage');
-            if (!selectApiMode || !selectCommunity) return;
+            if (!selectApiMode) return;
 
-            if (selectCommunity.value === 'Popcorn') {
-                // OMDb-only cannot provide Popcorn; automatically pick a MDBList-capable mode.
+            var mdbListRequiredSources = ['Popcorn', 'Metacritic', 'MetacriticUser', 'MdbList', 'Trakt', 'Tmdb', 'Letterboxd', 'RogerEbert'];
+            var moviesEl = view.querySelector('#selectMoviesRatingSource');
+            var seriesEl = view.querySelector('#selectSeriesRatingSource');
+            var needsMdb = (moviesEl && mdbListRequiredSources.indexOf(moviesEl.value) >= 0) ||
+                           (seriesEl && mdbListRequiredSources.indexOf(seriesEl.value) >= 0);
+
+            if (needsMdb) {
                 var normalized = this.getMdbListCompatibleApiMode(selectApiMode.value);
                 var changed = normalized !== selectApiMode.value;
-                if (changed) {
-                    selectApiMode.value = normalized;
-                }
+                if (changed) selectApiMode.value = normalized;
                 if (compatMsg) {
                     compatMsg.style.display = 'block';
                     compatMsg.textContent = changed
-                        ? 'Popcorn requires MDBList. API Mode was adjusted to include MDBList.'
-                        : 'Popcorn requires MDBList-compatible API Mode.';
+                        ? 'This source requires MDBList. API Mode was adjusted to include MDBList.'
+                        : 'This source requires MDBList-compatible API Mode.';
                 }
                 if (changed && opts.notify) {
-                    toast({ text: 'Popcorn requires MDBList. API Mode was updated.' });
+                    toast({ text: 'This source requires MDBList. API Mode was updated.' });
                 }
             } else if (compatMsg) {
                 compatMsg.style.display = 'none';
@@ -540,17 +542,30 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                 var selectApiMode = view.querySelector('#selectApiMode');
                 if (selectApiMode) selectApiMode.value = apiModeValue || 'OMDbWithMDBListFallback';
                 
-                var communitySourceMapArray = ['IMDb', 'Popcorn'];
-                var communityValue = config.CommunityRatingSource;
-                if (typeof communityValue === 'number') communityValue = communitySourceMapArray[communityValue];
-                if (!communityValue) {
-                    // Backwards compatibility with per-type settings.
-                    var moviesRatingValue = config.MoviesRatingSource;
-                    if (typeof moviesRatingValue === 'number') moviesRatingValue = communitySourceMapArray[moviesRatingValue];
-                    communityValue = moviesRatingValue || 'IMDb';
+                var communitySourceMapArray = ['IMDb', 'Popcorn', 'Metacritic', 'MetacriticUser', 'MdbList', 'Trakt', 'Tmdb', 'Letterboxd', 'RogerEbert'];
+                var criticSourceMapArray = ['RottenTomatoes', 'Metacritic', 'RottenTomatoesWithMetacriticFallback', 'MetacriticWithRottenTomatoesFallback', 'None'];
+
+                function loadCommunitySelect(selectId, rawValue, fallbackRawValue) {
+                    var val = rawValue;
+                    if (typeof val === 'number') val = communitySourceMapArray[val];
+                    if (!val) {
+                        val = fallbackRawValue;
+                        if (typeof val === 'number') val = communitySourceMapArray[val];
+                    }
+                    var el = view.querySelector(selectId);
+                    if (el) el.value = val || 'IMDb';
                 }
-                var selectCommunity = view.querySelector('#selectCommunityRatingSource');
-                if (selectCommunity) selectCommunity.value = communityValue || 'IMDb';
+                function loadCriticSelect(selectId, rawValue) {
+                    var val = rawValue;
+                    if (typeof val === 'number') val = criticSourceMapArray[val];
+                    var el = view.querySelector(selectId);
+                    if (el) el.value = val || 'RottenTomatoes';
+                }
+
+                loadCommunitySelect('#selectMoviesRatingSource', config.MoviesRatingSource, config.CommunityRatingSource);
+                loadCommunitySelect('#selectSeriesRatingSource', config.SeriesRatingSource, config.CommunityRatingSource);
+                loadCriticSelect('#selectMoviesCriticRatingSource', config.MoviesCriticRatingSource);
+                loadCriticSelect('#selectSeriesCriticRatingSource', config.SeriesCriticRatingSource);
 
                 var setChecked = function(id, val) {
                     var el = view.querySelector(id);
@@ -670,22 +685,29 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                         break;
                 }
 
-                var communitySourceMap = { 'IMDb': 0, 'Popcorn': 1 };
-                var communitySource = communitySourceMap[getValue('#selectCommunityRatingSource')] || 0;
-                if (communitySource === 1) {
+                var communitySourceMap = { 'IMDb': 0, 'Popcorn': 1, 'Metacritic': 2, 'MetacriticUser': 3, 'MdbList': 4, 'Trakt': 5, 'Tmdb': 6, 'Letterboxd': 7, 'RogerEbert': 8 };
+                var criticSourceMap = { 'RottenTomatoes': 0, 'Metacritic': 1, 'RottenTomatoesWithMetacriticFallback': 2, 'MetacriticWithRottenTomatoesFallback': 3, 'None': 4 };
+
+                var moviesSource = communitySourceMap[getValue('#selectMoviesRatingSource')] || 0;
+                var seriesSource = communitySourceMap[getValue('#selectSeriesRatingSource')] || 0;
+
+                // Auto-ensure MDBList-compatible mode if any non-IMDb source selected
+                if (moviesSource > 0 || seriesSource > 0) {
                     var compatibleMode = self.getMdbListCompatibleApiMode(apiModeStr);
                     if (compatibleMode !== apiModeStr) {
                         apiModeStr = compatibleMode;
                         config.ApiMode = apiModeMap[apiModeStr];
-                        config.PreferredSource = 1; // MDBList
+                        config.PreferredSource = 1;
                         config.AllowAlternateSourceFallback = true;
                     }
                 }
-                config.CommunityRatingSource = communitySource;
-                // Keep legacy per-type fields in sync for backwards compatibility.
-                config.MoviesRatingSource = communitySource;
-                config.SeriesRatingSource = communitySource;
+
+                config.MoviesRatingSource = moviesSource;
+                config.SeriesRatingSource = seriesSource;
                 config.EpisodesRatingSource = 0;
+                config.CommunityRatingSource = moviesSource; // keep legacy field in sync
+                config.MoviesCriticRatingSource = criticSourceMap[getValue('#selectMoviesCriticRatingSource')] || 0;
+                config.SeriesCriticRatingSource = criticSourceMap[getValue('#selectSeriesCriticRatingSource')] || 0;
                 
                 config.UpdateCommunityRating = getChecked('#chkUpdateCommunityRating');
                 config.UpdateCriticRating = getChecked('#chkUpdateCriticRating');
@@ -1206,12 +1228,12 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                     self.enforceCommunityApiCompatibility(view, { notify: false });
                 });
             }
-            var selectCommunityRatingSource = view.querySelector('#selectCommunityRatingSource');
-            if (selectCommunityRatingSource) {
-                selectCommunityRatingSource.addEventListener('change', function() {
+            ['#selectMoviesRatingSource', '#selectSeriesRatingSource'].forEach(function(id) {
+                var el = view.querySelector(id);
+                if (el) el.addEventListener('change', function() {
                     self.enforceCommunityApiCompatibility(view, { notify: true });
                 });
-            }
+            });
 
             // Load API counters
             self.updateApiCounters(view);
