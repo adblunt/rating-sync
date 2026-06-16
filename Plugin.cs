@@ -1000,12 +1000,12 @@ namespace RatingSync
             {
                 new PluginPageInfo
                 {
-                    Name = "RatingSyncConfiguration_v114",
+                    Name = "RatingSyncConfiguration_v115",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html"
                 },
                 new PluginPageInfo
                 {
-                    Name = "RatingSyncConfigurationjs_v114",
+                    Name = "RatingSyncConfigurationjs_v115",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.js"
                 }
             };
@@ -2196,10 +2196,10 @@ namespace RatingSync
                                 {
                                     skipReasons.Add("Community and Critic updates are disabled in settings");
                                 }
-                                else if (!config.UpdateCommunityRating && config.UpdateCriticRating && !ratings.CriticRating.HasValue)
+                                else if (!config.UpdateCommunityRating && config.UpdateCriticRating && targetCriticSource != CriticRatingSource.None && !ratings.CriticRating.HasValue)
                                 {
                                     skipReasons.Add("Community updates disabled in settings");
-                                    skipReasons.Add("No RT rating in API");
+                                    skipReasons.Add("No critic rating in API");
                                 }
                                 else if (targetSource != CommunityRatingSource.IMDb && !currentHasMdbList && !string.IsNullOrWhiteSpace(currentMdbListUnavailableReason))
                                 {
@@ -2226,10 +2226,11 @@ namespace RatingSync
                                 {
                                     skipReasons.Add("Community updates disabled in settings");
                                 }
-                                if (config.UpdateCriticRating && ratings.CriticRating.HasValue && item.CriticRating == ratings.CriticRating.Value)
+                                if (config.UpdateCriticRating && targetCriticSource != CriticRatingSource.None && ratings.CriticRating.HasValue && item.CriticRating == ratings.CriticRating.Value)
                                 {
-                                    var rtUnchangedSource = ratings.UsedMdbList ? "MDBList" : (ratings.UsedOmdb ? "OMDb" : "API");
-                                    skipReasons.Add($"RT unchanged ({item.CriticRating:F0}%) [{rtUnchangedSource}]");
+                                    var criticUnchangedLabel = (targetCriticSource == CriticRatingSource.Metacritic || targetCriticSource == CriticRatingSource.MetacriticWithRottenTomatoesFallback) ? "Metacritic" : "RT";
+                                    var criticUnchangedSource = ratings.UsedMdbList ? "MDBList" : (ratings.UsedOmdb ? "OMDb" : "API");
+                                    skipReasons.Add($"{criticUnchangedLabel} unchanged ({item.CriticRating:F0}%) [{criticUnchangedSource}]");
                                 }
                                 if (config.UpdateCommunityRating && !ratings.CommunityRating.HasValue)
                                 {
@@ -2250,9 +2251,10 @@ namespace RatingSync
                                         skipReasons.Add($"No {communityLogName} rating in API [{communitySourceLabel}]");
                                     }
                                 }
-                                if (config.UpdateCriticRating && !ratings.CriticRating.HasValue)
+                                if (config.UpdateCriticRating && targetCriticSource != CriticRatingSource.None && !ratings.CriticRating.HasValue)
                                 {
-                                    skipReasons.Add("No RT rating in API");
+                                    var criticSourceLabel = (targetCriticSource == CriticRatingSource.Metacritic || targetCriticSource == CriticRatingSource.MetacriticWithRottenTomatoesFallback) ? "Metacritic" : "RT";
+                                    skipReasons.Add($"No {criticSourceLabel} rating in API");
                                 }
                             }
                             var skipReason = skipReasons.Count > 0 ? string.Join(", ", skipReasons) : "No changes needed";

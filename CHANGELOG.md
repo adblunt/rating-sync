@@ -8,6 +8,12 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 - Improvement: Settings page restructured into three logical sections — API Setup (keys + mode + rate limits), Rating Sources (community + critic per type), Content (item types + scanning).
 - Improvement: Target framework upgraded from net462 to net472; eliminates ~90 netstandard shim DLLs from build output (deploy only `RatingSync.dll`).
+- Improvement: "Enable Community/Critic Rating updates" toggles moved from API Mode card to top of Rating Sources section where they logically belong.
+- Improvement: IMDb episode fallback toggle merged into the IMDb Fallback rate limit card in API Setup — all fallback config in one place.
+- Fix: Roger Ebert removed from TV Series community source options (Ebert only reviewed films; MDBList has no TV data for this source).
+- Improvement: Community source labels clarified — "Metacritic (Critic)" → "Metacritic Score", "Metacritic (User)" → "Metacritic User Score".
+- Improvement: API Mode "Both" option labelled and described more clearly to distinguish it from fallback modes.
+- Fix: Episode skip messages no longer mention RT/critic ratings (episodes never receive critic ratings).
 
 ## [1.1.1] - 2026-06-15
 

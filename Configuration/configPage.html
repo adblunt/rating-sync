@@ -1,5 +1,5 @@
 <div is="emby-scroller"
-    data-controller="configurationpage?name=RatingSyncConfigurationjs_v114"
+    data-controller="configurationpage?name=RatingSyncConfigurationjs_v115"
     class="view flex flex-direction-column scrollFrameY flex-grow"
     data-horizontal="false"
     data-forcescrollbar="true"
@@ -420,21 +420,10 @@
                                         <option value="MDBListOnly">MDBList only</option>
                                         <option value="OMDbWithMDBListFallback">OMDb with MDBList fallback</option>
                                         <option value="MDBListWithOMDbFallback">MDBList with OMDb fallback</option>
-                                        <option value="Both">Both</option>
+                                        <option value="Both">Both (always call both APIs)</option>
                                     </select>
-                                    <div class="fieldDescription">Fallback modes try the other API when ratings are missing.</div>
+                                    <div class="fieldDescription">Fallback modes call the second API only when the first returns no rating. Both always calls both regardless.</div>
                                 </div>
-
-                                <label class="checkboxContainer">
-                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateCommunityRating" />
-                                    <span>Enable Community Rating updates</span>
-                                </label>
-
-                                <label class="checkboxContainer">
-                                    <input type="checkbox" is="emby-checkbox" id="chkUpdateCriticRating" />
-                                    <span>Enable Critic Rating updates</span>
-                                </label>
-                                <div class="fieldDescription compatMessage" id="communitySourceCompatMessage">This source requires MDBList. API Mode was adjusted to include MDBList.</div>
                             </div>
                         </div>
 
@@ -468,6 +457,11 @@
                             <div class="settingsCard">
                                 <h3 class="subsectionTitle">IMDb Fallback</h3>
                                 <label class="checkboxContainer">
+                                    <input type="checkbox" is="emby-checkbox" id="chkEnableImdbScraping" />
+                                    <span>Enable IMDb episode fallback</span>
+                                </label>
+                                <div class="compactDescription">When OMDb has no episode rating, Rating Sync tries IMDb directly. Use sparingly — direct IMDb requests can trigger temporary blocks.</div>
+                                <label class="checkboxContainer" style="margin-top: 0.75em;">
                                     <input type="checkbox" is="emby-checkbox" id="chkImdbRateLimit" />
                                     <span>Enable daily limit</span>
                                 </label>
@@ -476,7 +470,6 @@
                                     <input id="txtImdbDailyLimit" type="number" is="emby-input" min="100" max="100000" />
                                     <div class="fieldDescription">Default: 1,000/day</div>
                                 </div>
-                                <div class="compactDescription">Only applies when IMDb episode fallback is enabled.</div>
                             </div>
                         </div>
                     </div>
@@ -484,7 +477,20 @@
                     <!-- Section 2: Rating Sources -->
                     <div class="settingsSection">
                         <h2 class="sectionTitle">Rating Sources</h2>
-                        <p class="settingsIntro">Choose which sources fill community and critic ratings for each content type.</p>
+                        <p class="settingsIntro">Choose what gets updated and which sources fill community and critic ratings for each content type.</p>
+
+                        <div class="settingsCard" style="margin-bottom: 1em;">
+                            <h3 class="subsectionTitle">What to Update</h3>
+                            <label class="checkboxContainer">
+                                <input type="checkbox" is="emby-checkbox" id="chkUpdateCommunityRating" />
+                                <span>Enable Community Rating updates</span>
+                            </label>
+                            <label class="checkboxContainer">
+                                <input type="checkbox" is="emby-checkbox" id="chkUpdateCriticRating" />
+                                <span>Enable Critic Rating updates</span>
+                            </label>
+                            <div class="fieldDescription compatMessage" id="communitySourceCompatMessage">This source requires MDBList. API Mode was adjusted to include MDBList.</div>
+                        </div>
 
                         <div class="settingsGrid">
                             <div class="settingsCard">
@@ -494,8 +500,8 @@
                                     <select id="selectMoviesRatingSource" is="emby-select">
                                         <option value="IMDb">IMDb</option>
                                         <option value="Popcorn">RT Audience (Popcorn)</option>
-                                        <option value="Metacritic">Metacritic (Critic)</option>
-                                        <option value="MetacriticUser">Metacritic (User)</option>
+                                        <option value="Metacritic">Metacritic Score</option>
+                                        <option value="MetacriticUser">Metacritic User Score</option>
                                         <option value="MdbList">MDBList Score</option>
                                         <option value="Trakt">Trakt</option>
                                         <option value="Tmdb">TMDb</option>
@@ -508,13 +514,12 @@
                                     <select id="selectSeriesRatingSource" is="emby-select">
                                         <option value="IMDb">IMDb</option>
                                         <option value="Popcorn">RT Audience (Popcorn)</option>
-                                        <option value="Metacritic">Metacritic (Critic)</option>
-                                        <option value="MetacriticUser">Metacritic (User)</option>
+                                        <option value="Metacritic">Metacritic Score</option>
+                                        <option value="MetacriticUser">Metacritic User Score</option>
                                         <option value="MdbList">MDBList Score</option>
                                         <option value="Trakt">Trakt</option>
                                         <option value="Tmdb">TMDb</option>
                                         <option value="Letterboxd">Letterboxd</option>
-                                        <option value="RogerEbert">Roger Ebert</option>
                                     </select>
                                 </div>
                                 <div class="fieldDescription">Episodes always use IMDb. All sources except IMDb require MDBList.</div>
@@ -542,7 +547,7 @@
                                         <option value="None">None</option>
                                     </select>
                                 </div>
-                                <div class="fieldDescription">Writes to Emby's Critic Rating field. Requires Critic Rating updates enabled above.</div>
+                                <div class="fieldDescription">Writes to Emby's Critic Rating field. Setting both types to None is equivalent to disabling critic updates above.</div>
                             </div>
                         </div>
                     </div>
@@ -569,20 +574,7 @@
                                     <input type="checkbox" is="emby-checkbox" id="chkUpdateEpisodes" />
                                     <span>TV Episodes</span>
                                 </label>
-                                <div class="compactDescription">Episodes use OMDb first; optional IMDb fallback can fill gaps.</div>
-                            </div>
-
-                            <div class="settingsCard">
-                                <h3 class="subsectionTitle">Episode Fallback</h3>
-                                <label class="checkboxContainer">
-                                    <input type="checkbox" is="emby-checkbox" id="chkEnableImdbScraping" />
-                                    <span>Enable IMDb episode fallback</span>
-                                </label>
-                                <div class="compactDescription">When OMDb has no episode rating, Rating Sync can try IMDb-specific sources.</div>
-
-                                <div class="noteBox">
-                                    <strong>Use sparingly:</strong> IMDb fallback can make direct IMDb-side requests. A conservative daily limit helps avoid temporary blocks.
-                                </div>
+                                <div class="compactDescription">Episodes use OMDb. IMDb fallback can be enabled under API Setup if OMDb has no rating.</div>
                             </div>
                         </div>
 
