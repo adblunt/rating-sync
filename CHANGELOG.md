@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [Unreleased]
+
+### Fixed
+- **Critical**: HTTP socket exhaustion — plugin now uses a single shared `HttpClient` instead of instantiating one per API call. On .NET Framework, this prevented port exhaustion on large library scans and eliminated silent HTTP failures.
+- **Critical**: Scraping no longer silently fails — enabled automatic decompression (`gzip`/`deflate`) on the HTTP client so IMDb HTML responses are properly decompressed before parsing.
+- **High**: All HTTP/file I/O errors now logged at Debug level instead of silently swallowed (`catch {}`). Diagnosing "scan found nothing" now requires checking logs, not reverse-engineering from missing data.
+- **High**: API endpoint input parsing — `long.Parse()` calls replaced with `TryParse()` guards to prevent unhandled 500 errors on malformed IDs in `GetSeasons`, `GetEpisodes`, and `RunSelected`.
+- **Medium**: Library path matching now uses directory separator boundary instead of bare `StartsWith()` — prevents "D:\Movies" filter from matching "D:\Movies2".
+- **Medium**: Float comparison at display precision — ratings now compared at rounded precision (1 decimal for community, whole percent for critic) to avoid spurious "updated" entries when API values round to the same display value.
+- **Medium**: `UsedMdbList` flag now only set when an actual MDBList API call was made, not unconditionally in fallback branches. Improves accuracy of source labels in logs and scan history.
+- **Minor**: Progress bar no longer stalls on early skip paths (missing season/episode info, per-item errors).
+
+## [1.1.6] - 2026-06-18
+
+- Fix: Selected scans targeting a specific series or season now always include episodes, regardless of the "Update Episodes" global toggle. Previously, if "Update Episodes" was disabled (the default), selecting a series in the Run tab would only queue the series item itself — all episodes were silently skipped.
+
 ## [1.1.5] - 2026-06-18
 
 - Feature: Critic Rating Source card now uses separate primary + fallback dropdowns, matching the Community Rating Source card layout.
