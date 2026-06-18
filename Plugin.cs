@@ -42,6 +42,7 @@ namespace RatingSync
         public DateTime? StartTime { get; set; }
         public DateTime? EndTime { get; set; }
         public double? EstimatedSecondsRemaining { get; set; }
+        public int FilteredByInterval { get; set; }
         public Dictionary<string, string> UpdatedDetails { get; set; } = new Dictionary<string, string>();
         public Dictionary<string, string> SkippedDetails { get; set; } = new Dictionary<string, string>();
         public Dictionary<string, string> FailureDetails { get; set; } = new Dictionary<string, string>();
@@ -74,6 +75,7 @@ namespace RatingSync
                     UpdatedItems = _progress.UpdatedItems,
                     SkippedItems = _progress.SkippedItems,
                     ErrorItems = _progress.ErrorItems,
+                    FilteredByInterval = _progress.FilteredByInterval,
                     PercentComplete = _progress.PercentComplete,
                     CurrentItem = _progress.CurrentItem,
                     StartTime = _progress.StartTime,
@@ -152,6 +154,15 @@ namespace RatingSync
             lock (_lock)
             {
                 _progress = new RefreshProgress();
+                _progress.FilteredByInterval = 0;
+            }
+        }
+
+        public static void SetFilteredByInterval(int count)
+        {
+            lock (_lock)
+            {
+                _progress.FilteredByInterval = count;
             }
         }
 
@@ -169,13 +180,15 @@ namespace RatingSync
         private static readonly object _lock = new object();
         private static List<BaseItem> _selectedItems = new List<BaseItem>();
         private static bool _hasItems = false;
+        private static bool _forceRefresh = false;
 
-        public static void SetItems(List<BaseItem> items)
+        public static void SetItems(List<BaseItem> items, bool forceRefresh = false)
         {
             lock (_lock)
             {
                 _selectedItems = items ?? new List<BaseItem>();
                 _hasItems = _selectedItems.Count > 0;
+                _forceRefresh = forceRefresh;
             }
         }
 
@@ -186,6 +199,7 @@ namespace RatingSync
                 var items = _selectedItems;
                 _selectedItems = new List<BaseItem>();
                 _hasItems = false;
+                _forceRefresh = false;
                 return items;
             }
         }
@@ -193,6 +207,11 @@ namespace RatingSync
         public static bool HasItems
         {
             get { lock (_lock) { return _hasItems; } }
+        }
+
+        public static bool ForceRefresh
+        {
+            get { lock (_lock) { return _forceRefresh; } }
         }
     }
 
@@ -335,6 +354,9 @@ namespace RatingSync
         // When scanning at the "All Movies" / "All Series" level, optionally filter to only items added within N days.
         // 0 means no filter.
         public int AddedWithinDays { get; set; }
+
+        // When true, bypasses the rescan interval and processes all selected items regardless of last scan time.
+        public bool ForceRefresh { get; set; }
     }
 
     [Route("/RatingSync/Movies", "GET", Summary = "Gets movies in a library")]
@@ -947,7 +969,7 @@ namespace RatingSync
             if (items.Count > 0)
             {
                 // Store selected items for the task to pick up
-                SelectedItemsStore.SetItems(items);
+                SelectedItemsStore.SetItems(items, request.ForceRefresh);
                 if (!hasSpecificTarget && request.AddedWithinDays > 0)
                 {
                     ProgressTracker.SetMessage($"Queued {items.Count} items (added last {request.AddedWithinDays} day(s))");
@@ -1000,12 +1022,12 @@ namespace RatingSync
             {
                 new PluginPageInfo
                 {
-                    Name = "RatingSyncConfiguration_v115",
+                    Name = "RatingSyncConfiguration_v120",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html"
                 },
                 new PluginPageInfo
                 {
-                    Name = "RatingSyncConfigurationjs_v115",
+                    Name = "RatingSyncConfigurationjs_v120",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.js"
                 }
             };
@@ -1048,6 +1070,8 @@ namespace RatingSync
         public CommunityRatingSource MoviesRatingSource { get; set; }
         public CommunityRatingSource SeriesRatingSource { get; set; }
         public CommunityRatingSource EpisodesRatingSource { get; set; }
+        public CommunityRatingSource MoviesFallbackRatingSource { get; set; }
+        public CommunityRatingSource SeriesFallbackRatingSource { get; set; }
 
         // Critic Rating Source configured by item type
         public CriticRatingSource MoviesCriticRatingSource { get; set; }
@@ -1058,7 +1082,7 @@ namespace RatingSync
         public bool UpdateSeries { get; set; }
         public bool UpdateEpisodes { get; set; }
         
-        // Episode Scraping Fallback
+        // IMDb Fallback (imdbapi.dev)
         public bool EnableImdbScraping { get; set; }
         
         // Smart Scanning
@@ -1088,6 +1112,8 @@ namespace RatingSync
             MoviesRatingSource = CommunityRatingSource.IMDb;
             SeriesRatingSource = CommunityRatingSource.IMDb;
             EpisodesRatingSource = CommunityRatingSource.IMDb;
+            MoviesFallbackRatingSource = CommunityRatingSource.None;
+            SeriesFallbackRatingSource = CommunityRatingSource.None;
             MoviesCriticRatingSource = CriticRatingSource.RottenTomatoes;
             SeriesCriticRatingSource = CriticRatingSource.RottenTomatoes;
              UpdateMovies = true;
@@ -1128,7 +1154,8 @@ namespace RatingSync
         Trakt,
         Tmdb,
         Letterboxd,
-        RogerEbert
+        RogerEbert,
+        None
     }
 
     public enum CriticRatingSource
@@ -1688,6 +1715,8 @@ namespace RatingSync
         private static readonly object _mdbListRateLimitLock = new object();
         private static DateTime? _mdbListBlockedUntilUtc = null;
         private static string _mdbListBlockedMessage = null;
+        // Per-run cache: series IMDb ID → MDBList show response (null = tried, not found)
+        private Dictionary<string, MdbListResponse> _mdbShowCache;
 
         public RatingRefreshTask(ILibraryManager libraryManager, ILogManager logManager, IJsonSerializer jsonSerializer)
         {
@@ -1696,9 +1725,9 @@ namespace RatingSync
             _jsonSerializer = jsonSerializer;
         }
 
-        public string Name => "Refresh IMDb and Rotten Tomatoes Ratings";
+        public string Name => "Refresh Ratings";
 
-        public string Description => "Updates community ratings from IMDb and critic ratings from Rotten Tomatoes";
+        public string Description => "Updates community and critic ratings from IMDb, Rotten Tomatoes, Metacritic, MDBList, and more.";
 
         public string Category => "Library";
 
@@ -1792,7 +1821,7 @@ namespace RatingSync
             }
             if (config.ImdbRateLimitEnabled && config.EnableImdbScraping)
             {
-                Log($"IMDb scraping: {imdbScrapesUsed}/{config.ImdbDailyLimit} scrapes used today{(imdbLimitReached ? " (LIMIT REACHED)" : "")}", imdbLimitReached ? "warning" : "info");
+                Log($"imdbapi.dev: {imdbScrapesUsed}/{config.ImdbDailyLimit} calls used today{(imdbLimitReached ? " (LIMIT REACHED)" : "")}", imdbLimitReached ? "warning" : "info");
             }
 
             var mdbListBlockedByApi = IsMdbListTemporarilyBlocked(out var mdbListBlockMessage);
@@ -1829,12 +1858,28 @@ namespace RatingSync
             {
                 List<BaseItem> items;
                 bool isSelectedScan = SelectedItemsStore.HasItems;
+                int skippedByInterval = 0;
                 
                 if (isSelectedScan)
                 {
-                    // Use pre-selected items
+                    bool forceRefresh = SelectedItemsStore.ForceRefresh;
                     items = SelectedItemsStore.GetAndClearItems();
-                    Log($"Running targeted scan on {items.Count} selected items", "info");
+
+                    if (!forceRefresh && config.RescanIntervalDays > 0)
+                    {
+                        var rescanCutoff = DateTime.UtcNow.AddDays(-config.RescanIntervalDays);
+                        var beforeFilter = items.Count;
+                        items = items.Where(i =>
+                        {
+                            var entry = ScanHistoryManager.GetEntry(i.InternalId.ToString());
+                            return entry == null || entry.LastScanned <= rescanCutoff;
+                        }).ToList();
+                        skippedByInterval = beforeFilter - items.Count;
+                        if (skippedByInterval > 0)
+                            Log($"Skipped {skippedByInterval} item(s) scanned within the last {config.RescanIntervalDays} day(s). Enable Force Refresh to override.", "info");
+                    }
+
+                    Log($"Running targeted scan on {items.Count} selected item(s){(forceRefresh ? " (force refresh)" : "")}", "info");
                 }
                 else
                 {
@@ -1946,9 +1991,26 @@ namespace RatingSync
                 // Safety: never process Specials / Season 0 episodes (also applies to selected scans)
                 items = items.Where(i => !(i is Episode ep && (ep.ParentIndexNumber ?? 0) == 0)).ToList();
 
+                // Prioritize items with no rating so API quota goes to filling gaps first
+                {
+                    bool IsUnrated(BaseItem i) =>
+                        (config.UpdateCommunityRating && (!i.CommunityRating.HasValue || i.CommunityRating.Value == 0f)) ||
+                        (config.UpdateCriticRating && (!i.CriticRating.HasValue || i.CriticRating.Value == 0f));
+                    var unratedItems = items.Where(IsUnrated).ToList();
+                    if (unratedItems.Count > 0 && unratedItems.Count < items.Count)
+                    {
+                        var ratedItems = items.Where(i => !IsUnrated(i)).ToList();
+                        Log($"Prioritizing {unratedItems.Count} unrated item(s) ahead of {ratedItems.Count} already rated", "info");
+                        items = unratedItems.Concat(ratedItems).ToList();
+                    }
+                }
+
                 ProgressTracker.Start(items.Count);
+                if (skippedByInterval > 0)
+                    ProgressTracker.SetFilteredByInterval(skippedByInterval);
                 scanSession = ScanHistoryManager.StartSession(items.Count);
 
+                _mdbShowCache = new Dictionary<string, MdbListResponse>(StringComparer.OrdinalIgnoreCase);
                 foreach (var item in items)
                 {
                     if (cancellationToken.IsCancellationRequested)
@@ -2040,11 +2102,9 @@ namespace RatingSync
                                 episodeSkipReasons.Add($"OMDb daily limit reached ({omdbRequests + omdbCalls}/{config.OmdbDailyLimit})");
 
                             if (!config.EnableImdbScraping)
-                                episodeSkipReasons.Add("IMDb episode fallback disabled");
+                                episodeSkipReasons.Add("imdbapi.dev disabled");
                             else if (currentImdbLimitReached && config.ImdbRateLimitEnabled)
-                                episodeSkipReasons.Add($"IMDb episode fallback daily limit reached ({imdbScrapesUsed + imdbScrapeCalls}/{config.ImdbDailyLimit})");
-
-                            episodeSkipReasons.Add("MDBList does not support episode lookups");
+                                episodeSkipReasons.Add($"imdbapi.dev limit reached ({imdbScrapesUsed + imdbScrapeCalls}/{config.ImdbDailyLimit})");
 
                             var episodeSkipReason = string.Join(", ", episodeSkipReasons);
                             skipped++;
@@ -2078,27 +2138,31 @@ namespace RatingSync
                         
                         CommunityRatingSource targetSource;
                         CriticRatingSource targetCriticSource;
+                        CommunityRatingSource fallbackSource;
                         if (item is Episode)
                         {
                             targetSource = CommunityRatingSource.IMDb;
                             targetCriticSource = CriticRatingSource.None;
+                            fallbackSource = CommunityRatingSource.None;
                         }
                         else if (item is Movie)
                         {
                             targetSource = config.MoviesRatingSource;
                             targetCriticSource = config.MoviesCriticRatingSource;
+                            fallbackSource = config.MoviesFallbackRatingSource;
                         }
                         else
                         {
                             targetSource = config.SeriesRatingSource;
                             targetCriticSource = config.SeriesCriticRatingSource;
+                            fallbackSource = config.SeriesFallbackRatingSource;
                         }
-                        
+
                         var currentImdbScrapesRemaining = config.ImdbRateLimitEnabled
                             ? Math.Max(0, config.ImdbDailyLimit - (imdbScrapesUsed + imdbScrapeCalls))
                             : int.MaxValue;
 
-                        var ratings = await FetchRatings(imdbId, config, targetSource, targetCriticSource, episodeInfo, currentHasOmdb, currentHasMdbList, currentHasImdbScraping, currentImdbScrapesRemaining);
+                        var ratings = await FetchRatings(imdbId, config, targetSource, targetCriticSource, episodeInfo, currentHasOmdb, currentHasMdbList, currentHasImdbScraping, currentImdbScrapesRemaining, fallbackSource);
                         
                         // Track API calls
                         if (ratings.UsedOmdb)
@@ -2125,19 +2189,37 @@ namespace RatingSync
                             imdbScrapeCalls += ratings.ImdbScrapeRequests;
                             ScanHistoryManager.IncrementImdbScrapeCount(ratings.ImdbScrapeRequests);
                         }
+                        if (ratings.OmdbHadNoEpisodeRating)
+                        {
+                            if (ratings.UsedMdbList)
+                                Log($"OMDb returned no rating for '{itemName}' — used MDBList fallback", "info");
+                            else if (ratings.UsedScraping)
+                                Log($"OMDb returned no rating for '{itemName}' — used imdbapi.dev fallback", "info");
+                            else if (!currentHasImdbScraping)
+                            {
+                                var scrapeBlockReason = !config.EnableImdbScraping
+                                    ? "imdbapi.dev disabled"
+                                    : $"imdbapi.dev daily limit reached ({imdbScrapesUsed + imdbScrapeCalls}/{config.ImdbDailyLimit})";
+                                Log($"OMDb returned no rating for '{itemName}' — imdbapi.dev fallback unavailable ({scrapeBlockReason})", "info");
+                            }
+                            else
+                                Log($"OMDb returned no rating for '{itemName}' — imdbapi.dev also returned nothing", "info");
+                        }
 
                         // Determine source label for display
                         string sourceLabel;
-                        if (ratings.UsedScraping)
-                            sourceLabel = "Scraped";
+                        if (ratings.UsedOmdb && ratings.UsedScraping)
+                            sourceLabel = "imdbapi.dev (not in OMDb)";
+                        else if (ratings.UsedScraping)
+                            sourceLabel = "imdbapi.dev";
                         else if (ratings.UsedOmdb && ratings.UsedMdbList)
-                            sourceLabel = "OMDb+MDB";
+                            sourceLabel = "OMDb+MDBList";
                         else if (ratings.UsedOmdb)
                             sourceLabel = "OMDb";
                         else if (ratings.UsedMdbList)
                             sourceLabel = "MDBList";
                         else
-                            sourceLabel = "API";
+                            sourceLabel = "unknown source";
 
                         bool itemUpdated = false;
                         var changes = new List<string>();
@@ -2149,8 +2231,10 @@ namespace RatingSync
                             {
                                 item.CommunityRating = ratings.CommunityRating.Value;
                                 itemUpdated = true;
-                                var communityLogName = GetCommunitySourceDisplayName(targetSource);
-                                changes.Add($"{communityLogName}: {(oldRating.HasValue ? oldRating.Value.ToString("F1") : "none")} → {ratings.CommunityRating.Value:F1} ({sourceLabel})");
+                                var actualSource = ratings.ActualCommunitySource ?? targetSource;
+                                var communityLogName = GetCommunitySourceDisplayName(actualSource);
+                                var fallbackSuffix = actualSource != targetSource ? $" [fallback from {GetCommunitySourceDisplayName(targetSource)}]" : "";
+                                changes.Add($"{communityLogName}{fallbackSuffix}: {(oldRating.HasValue ? oldRating.Value.ToString("F1") : "none")} → {ratings.CommunityRating.Value:F1} ({sourceLabel})");
                             }
                         }
 
@@ -2187,7 +2271,7 @@ namespace RatingSync
                             if (ratings.MdbListRateLimited)
                             {
                                 skipReasons.Add(string.IsNullOrWhiteSpace(ratings.MdbListRateLimitMessage)
-                                    ? "MDBList API limit reached (HTTP 429)"
+                                    ? "MDBList rate limited"
                                     : ratings.MdbListRateLimitMessage);
                             }
                             if (!ratings.CommunityRating.HasValue && !ratings.CriticRating.HasValue)
@@ -2199,7 +2283,7 @@ namespace RatingSync
                                 else if (!config.UpdateCommunityRating && config.UpdateCriticRating && targetCriticSource != CriticRatingSource.None && !ratings.CriticRating.HasValue)
                                 {
                                     skipReasons.Add("Community updates disabled in settings");
-                                    skipReasons.Add("No critic rating in API");
+                                    skipReasons.Add("No critic rating found");
                                 }
                                 else if (targetSource != CommunityRatingSource.IMDb && !currentHasMdbList && !string.IsNullOrWhiteSpace(currentMdbListUnavailableReason))
                                 {
@@ -2211,8 +2295,21 @@ namespace RatingSync
                                         ratings.UsedOmdb && ratings.UsedMdbList ? "OMDb+MDBList"
                                         : (ratings.UsedMdbList ? "MDBList"
                                         : (ratings.UsedOmdb ? "OMDb"
-                                        : (targetSource != CommunityRatingSource.IMDb ? "MDBList" : "API")));
-                                    skipReasons.Add($"No ratings found from API [{noRatingsSourceLabel}]");
+                                        : (targetSource != CommunityRatingSource.IMDb ? "MDBList" : "unknown source")));
+                                    string fallbackNote = null;
+                                    if (ratings.OmdbHadNoEpisodeRating)
+                                    {
+                                        if (!config.EnableImdbScraping)
+                                            fallbackNote = "imdbapi.dev fallback not enabled";
+                                        else if (!currentHasImdbScraping)
+                                            fallbackNote = $"imdbapi.dev limit exhausted ({imdbScrapesUsed + imdbScrapeCalls}/{config.ImdbDailyLimit})";
+                                        else
+                                            fallbackNote = "imdbapi.dev also returned no rating";
+                                    }
+                                    var skipMsg = fallbackNote != null
+                                        ? $"No ratings found [{noRatingsSourceLabel}] — {fallbackNote}"
+                                        : $"No ratings found [{noRatingsSourceLabel}]";
+                                    skipReasons.Add(skipMsg);
                                 }
                             }
                             else
@@ -2239,7 +2336,7 @@ namespace RatingSync
                                         if (!string.IsNullOrWhiteSpace(currentMdbListUnavailableReason))
                                             skipReasons.Add(currentMdbListUnavailableReason);
                                         else
-                                            skipReasons.Add($"No {communityLogName} rating in API [MDBList]");
+                                            skipReasons.Add($"No {communityLogName} rating [MDBList]");
                                     }
                                     else
                                     {
@@ -2247,14 +2344,21 @@ namespace RatingSync
                                             targetSource != CommunityRatingSource.IMDb ? "MDBList"
                                             : (ratings.UsedOmdb && ratings.UsedMdbList ? "OMDb+MDBList"
                                             : (ratings.UsedOmdb ? "OMDb"
-                                            : (ratings.UsedMdbList ? "MDBList" : "API")));
-                                        skipReasons.Add($"No {communityLogName} rating in API [{communitySourceLabel}]");
+                                            : (ratings.UsedMdbList ? "MDBList" : "unknown source")));
+                                        skipReasons.Add($"No {communityLogName} rating [{communitySourceLabel}]");
                                     }
                                 }
                                 if (config.UpdateCriticRating && targetCriticSource != CriticRatingSource.None && !ratings.CriticRating.HasValue)
                                 {
-                                    var criticSourceLabel = (targetCriticSource == CriticRatingSource.Metacritic || targetCriticSource == CriticRatingSource.MetacriticWithRottenTomatoesFallback) ? "Metacritic" : "RT";
-                                    skipReasons.Add($"No {criticSourceLabel} rating in API");
+                                    var criticMissingLabel = targetCriticSource switch
+                                    {
+                                        CriticRatingSource.Metacritic => "No Metacritic rating",
+                                        CriticRatingSource.RottenTomatoesWithMetacriticFallback => "No RT or Metacritic rating",
+                                        CriticRatingSource.MetacriticWithRottenTomatoesFallback => "No Metacritic or RT rating",
+                                        _ => "No RT rating"
+                                    };
+                                    var criticMissingApi = ratings.UsedMdbList ? "MDBList" : (ratings.UsedOmdb ? "OMDb" : "API");
+                                    skipReasons.Add($"{criticMissingLabel} [{criticMissingApi}]");
                                 }
                             }
                             var skipReason = skipReasons.Count > 0 ? string.Join(", ", skipReasons) : "No changes needed";
@@ -2315,25 +2419,26 @@ namespace RatingSync
                 ScanHistoryManager.Save();
                 
                 ProgressTracker.Stop();
-                
-// Build API usage summary
-                 var apiUsage = new List<string>();
-                 if (!string.IsNullOrEmpty(config.OmdbApiKey))
-                 {
-                     var omdbTotal = omdbRequests + omdbCalls;
-                     apiUsage.Add($"OMDb: {omdbTotal}{(config.OmdbRateLimitEnabled ? "/" + config.OmdbDailyLimit : "")}");
-                 }
-                 if (!string.IsNullOrEmpty(config.MdbListApiKey))
-                 {
-                     var mdblistTotal = mdblistRequests + mdblistCalls;
-                     apiUsage.Add($"MDBList: {mdblistTotal}{(config.MdbListRateLimitEnabled ? "/" + config.MdbListDailyLimit : "")}");
-                 }
-                 if (config.EnableImdbScraping)
-                 {
-                     var imdbTotal = imdbScrapesUsed + imdbScrapeCalls;
-                     apiUsage.Add($"IMDb scraping: {imdbTotal}{(config.ImdbRateLimitEnabled ? "/" + config.ImdbDailyLimit : "")}");
-                 }
-                 var apiInfo = apiUsage.Count > 0 ? $" | API calls: {string.Join(", ", apiUsage)}" : "";
+                _mdbShowCache = null;
+
+                // Build API usage summary
+                var apiUsage = new List<string>();
+                if (!string.IsNullOrEmpty(config.OmdbApiKey))
+                {
+                    var omdbTotal = omdbRequests + omdbCalls;
+                    apiUsage.Add($"OMDb: {omdbTotal}{(config.OmdbRateLimitEnabled ? "/" + config.OmdbDailyLimit : "")}");
+                }
+                if (!string.IsNullOrEmpty(config.MdbListApiKey))
+                {
+                    var mdblistTotal = mdblistRequests + mdblistCalls;
+                    apiUsage.Add($"MDBList: {mdblistTotal}{(config.MdbListRateLimitEnabled ? "/" + config.MdbListDailyLimit : "")}");
+                }
+                if (config.EnableImdbScraping)
+                {
+                    var imdbTotal = imdbScrapesUsed + imdbScrapeCalls;
+                    apiUsage.Add($"imdbapi.dev: {imdbTotal}{(config.ImdbRateLimitEnabled ? "/" + config.ImdbDailyLimit : "")}");
+                }
+                var apiInfo = apiUsage.Count > 0 ? $" | API calls: {string.Join(", ", apiUsage)}" : "";
                 
                 Log($"Rating refresh completed! Processed: {processed}, Updated: {updated}, Skipped: {skipped}, Errors: {errors}{apiInfo}", "success");
             }
@@ -2366,13 +2471,14 @@ namespace RatingSync
                 }
                 
                 ProgressTracker.Stop();
+                _mdbShowCache = null;
                 Log($"Fatal error during rating refresh: {ex.Message}", "error");
                 _logger.ErrorException("Error during rating refresh", ex);
                 throw;
             }
         }
 
-        private async Task<RatingData> FetchRatings(string imdbId, PluginConfiguration config, CommunityRatingSource targetSource, CriticRatingSource criticSource, EpisodeInfo episodeInfo, bool canUseOmdb, bool canUseMdbList, bool canUseImdbScraping = true, int imdbScrapesRemaining = int.MaxValue)
+        private async Task<RatingData> FetchRatings(string imdbId, PluginConfiguration config, CommunityRatingSource targetSource, CriticRatingSource criticSource, EpisodeInfo episodeInfo, bool canUseOmdb, bool canUseMdbList, bool canUseImdbScraping = true, int imdbScrapesRemaining = int.MaxValue, CommunityRatingSource fallbackSource = CommunityRatingSource.None)
         {
             var result = new RatingData();
             var remainingImdbScrapes = canUseImdbScraping ? Math.Max(0, imdbScrapesRemaining) : 0;
@@ -2397,6 +2503,8 @@ namespace RatingSync
                     result.CommunityRating = omdbData.CommunityRating;
                     result.CriticRating = omdbData.CriticRating;
                     result.UsedOmdb = true;
+                    if (!result.CommunityRating.HasValue)
+                        result.OmdbHadNoEpisodeRating = true;
                 }
 
                 // Fallback: use api.imdbapi.dev (unofficial IMDb API, no key required) if enabled and no rating found.
@@ -2469,9 +2577,12 @@ namespace RatingSync
                                            (config.UpdateCriticRating && criticSource != CriticRatingSource.None && !result.CriticRating.HasValue);
                     if (config.ApiMode == ApiMode.OMDbWithMDBListFallback && needsMdbFallback && canUseMdbList && !string.IsNullOrEmpty(config.MdbListApiKey))
                     {
-                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, targetSource, criticSource, episodeInfo);
+                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, targetSource, criticSource, episodeInfo, fallbackSource);
                         if (!result.CommunityRating.HasValue && mdbData.CommunityRating.HasValue)
+                        {
                             result.CommunityRating = mdbData.CommunityRating;
+                            result.ActualCommunitySource = mdbData.ActualCommunitySource;
+                        }
                         if (!result.CriticRating.HasValue && mdbData.CriticRating.HasValue)
                             result.CriticRating = mdbData.CriticRating;
                         if (mdbData.MdbListRateLimited)
@@ -2488,8 +2599,9 @@ namespace RatingSync
                 case ApiMode.MDBListWithOMDbFallback:
                     if (canUseMdbList && !string.IsNullOrEmpty(config.MdbListApiKey))
                     {
-                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, targetSource, criticSource, episodeInfo);
+                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, targetSource, criticSource, episodeInfo, fallbackSource);
                         result.CommunityRating = mdbData.CommunityRating;
+                        result.ActualCommunitySource = mdbData.ActualCommunitySource;
                         result.CriticRating = mdbData.CriticRating;
                         if (mdbData.MdbListRateLimited)
                         {
@@ -2524,9 +2636,12 @@ namespace RatingSync
 
                     if ((!result.CommunityRating.HasValue || !result.CriticRating.HasValue) && canUseMdbList && !string.IsNullOrEmpty(config.MdbListApiKey))
                     {
-                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, targetSource, criticSource, episodeInfo);
+                        var mdbData = await FetchFromMdbList(imdbId, config.MdbListApiKey, targetSource, criticSource, episodeInfo, fallbackSource);
                         if (!result.CommunityRating.HasValue && mdbData.CommunityRating.HasValue)
+                        {
                             result.CommunityRating = mdbData.CommunityRating;
+                            result.ActualCommunitySource = mdbData.ActualCommunitySource;
+                        }
                         if (!result.CriticRating.HasValue && mdbData.CriticRating.HasValue)
                             result.CriticRating = mdbData.CriticRating;
                         if (mdbData.MdbListRateLimited)
@@ -2540,10 +2655,24 @@ namespace RatingSync
                     break;
             }
 
+            // Last-resort: imdbapi.dev (free, no key) when all configured sources returned no community rating.
+            if (!result.CommunityRating.HasValue && canUseImdbScraping && !string.IsNullOrWhiteSpace(imdbId))
+            {
+                var scraped = await TryImdbScrapeRequest(() => FetchImdbApiDevRating(imdbId));
+                if (scraped.HasValue)
+                {
+                    result.CommunityRating = scraped;
+                    result.ActualCommunitySource = CommunityRatingSource.IMDb;
+                    result.UsedScraping = true;
+                }
+            }
+
             // Safety guard: all non-IMDb community ratings must come from MDBList only.
-            if (targetSource != CommunityRatingSource.IMDb && !result.UsedMdbList)
+            var effectiveSource = result.ActualCommunitySource ?? targetSource;
+            if (effectiveSource != CommunityRatingSource.IMDb && effectiveSource != CommunityRatingSource.None && !result.UsedMdbList)
             {
                 result.CommunityRating = null;
+                result.ActualCommunitySource = null;
             }
 
             return result;
@@ -2659,7 +2788,7 @@ namespace RatingSync
                 case CommunityRatingSource.Popcorn: return "RT Audience";
                 case CommunityRatingSource.Metacritic: return "Metacritic";
                 case CommunityRatingSource.MetacriticUser: return "Metacritic User";
-                case CommunityRatingSource.MdbList: return "MDBList";
+                case CommunityRatingSource.MdbList: return "MDBList Score";
                 case CommunityRatingSource.Trakt: return "Trakt";
                 case CommunityRatingSource.Tmdb: return "TMDb";
                 case CommunityRatingSource.Letterboxd: return "Letterboxd";
@@ -2668,13 +2797,105 @@ namespace RatingSync
             }
         }
 
-        private async Task<RatingData> FetchFromMdbList(string imdbId, string apiKey, CommunityRatingSource targetSource, CriticRatingSource criticSource, EpisodeInfo episodeInfo = null)
+        private float? ExtractMdbCommunityRating(MdbListResponse data, Func<string, MdbListRating> findRating, CommunityRatingSource source)
+        {
+            switch (source)
+            {
+                case CommunityRatingSource.Popcorn:
+                    var popcorn = findRating("popcorn");
+                    return popcorn != null && popcorn.value.HasValue && popcorn.value.Value > 0 ? popcorn.value.Value / 10f : (float?)null;
+                case CommunityRatingSource.Metacritic:
+                    var mc = findRating("metacritic");
+                    return mc != null && mc.value.HasValue && mc.value.Value > 0 ? mc.value.Value / 10f : (float?)null;
+                case CommunityRatingSource.MetacriticUser:
+                    var mcu = findRating("metacriticuser");
+                    return mcu != null && mcu.value.HasValue && mcu.value.Value > 0 ? (mcu.value.Value > 10f ? mcu.value.Value / 10f : mcu.value.Value) : (float?)null;
+                case CommunityRatingSource.MdbList:
+                    var mdb = findRating("mdblist");
+                    if (mdb != null && mdb.value.HasValue && mdb.value.Value > 0) return mdb.value.Value / 10f;
+                    return data.score.HasValue && data.score.Value > 0 ? data.score.Value / 10f : (float?)null;
+                case CommunityRatingSource.Trakt:
+                    var trakt = findRating("trakt");
+                    return trakt != null && trakt.value.HasValue && trakt.value.Value > 0 ? trakt.value.Value / 10f : (float?)null;
+                case CommunityRatingSource.Tmdb:
+                    var tmdb = findRating("tmdb");
+                    return tmdb != null && tmdb.value.HasValue && tmdb.value.Value > 0 ? tmdb.value.Value / 10f : (float?)null;
+                case CommunityRatingSource.Letterboxd:
+                    var lb = findRating("letterboxd");
+                    return lb != null && lb.value.HasValue && lb.value.Value > 0 ? lb.value.Value / 10f : (float?)null;
+                case CommunityRatingSource.RogerEbert:
+                    var re = findRating("rogerebert");
+                    return re != null && re.value.HasValue && re.value.Value > 0 ? re.value.Value * 2.5f : (float?)null;
+                case CommunityRatingSource.None:
+                    return null;
+                default: // IMDb
+                    var imdb = findRating("imdb");
+                    if (imdb != null && imdb.value.HasValue && imdb.value.Value > 0) return imdb.value.Value;
+                    return data.score.HasValue && data.score.Value > 0 ? data.score.Value / 10f : (float?)null;
+            }
+        }
+
+        private async Task<RatingData> FetchFromMdbList(string imdbId, string apiKey, CommunityRatingSource targetSource, CriticRatingSource criticSource, EpisodeInfo episodeInfo = null, CommunityRatingSource fallbackSource = CommunityRatingSource.None)
         {
             var result = new RatingData();
-            
-            // MDBList doesn't support episode-specific lookups - skip for episodes
+
+            // Episode ratings are embedded in the show response under seasons[].episodes[]
             if (episodeInfo != null)
             {
+                if (string.IsNullOrWhiteSpace(episodeInfo.SeriesImdbId) ||
+                    episodeInfo.SeasonNumber <= 0 || episodeInfo.EpisodeNumber <= 0)
+                    return result;
+
+                try
+                {
+                    MdbListResponse showData;
+                    if (_mdbShowCache != null && _mdbShowCache.ContainsKey(episodeInfo.SeriesImdbId))
+                    {
+                        showData = _mdbShowCache[episodeInfo.SeriesImdbId]; // null = previously tried, not found
+                    }
+                    else
+                    {
+                        using (var episodeClient = new HttpClient())
+                        {
+                            episodeClient.Timeout = TimeSpan.FromSeconds(15);
+                            var showUrl = $"https://api.mdblist.com/imdb/show/{episodeInfo.SeriesImdbId}?apikey={apiKey}";
+                            HttpResponseMessage showResponse;
+                            string showBody;
+                            try
+                            {
+                                showResponse = await episodeClient.GetAsync(showUrl);
+                                showBody = await showResponse.Content.ReadAsStringAsync();
+                            }
+                            catch (HttpRequestException) { return result; }
+
+                            if ((int)showResponse.StatusCode == 429)
+                            {
+                                result.MdbListRateLimited = true;
+                                result.MdbListRateLimitUntilUtc = GetMdbListRetryAfterUtc(showResponse);
+                                result.MdbListRateLimitMessage = BuildMdbListRateLimitMessage(showResponse);
+                                return result;
+                            }
+
+                            showData = showResponse.IsSuccessStatusCode
+                                ? _jsonSerializer.DeserializeFromString<MdbListResponse>(showBody)
+                                : null;
+
+                            if (_mdbShowCache != null)
+                                _mdbShowCache[episodeInfo.SeriesImdbId] = showData; // cache even if null
+                        }
+                    }
+
+                    var season = showData?.seasons?.FirstOrDefault(s => s.season_number == episodeInfo.SeasonNumber);
+                    var episode = season?.episodes?.FirstOrDefault(e => e.episode_number == episodeInfo.EpisodeNumber);
+                    if (episode?.rating != null && episode.rating.Value > 0)
+                    {
+                        result.CommunityRating = episode.rating.Value / 10f;
+                        result.ActualCommunitySource = CommunityRatingSource.IMDb;
+                        result.UsedMdbList = true;
+                    }
+                }
+                catch (Exception) { }
+
                 return result;
             }
             
@@ -2739,65 +2960,15 @@ namespace RatingSync
                                 !string.IsNullOrWhiteSpace(r.source) &&
                                 string.Equals(r.source, sourceName, StringComparison.OrdinalIgnoreCase));
 
-                        // Community Rating
-                        if (targetSource == CommunityRatingSource.Popcorn)
+                        // Community Rating — try primary source, then fallback if configured
+                        result.CommunityRating = ExtractMdbCommunityRating(data, findRating, targetSource);
+                        result.ActualCommunitySource = targetSource;
+
+                        if (!result.CommunityRating.HasValue && fallbackSource != CommunityRatingSource.None && fallbackSource != targetSource)
                         {
-                            var popcornRating = findRating("popcorn");
-                            if (popcornRating != null && popcornRating.value.HasValue && popcornRating.value.Value > 0)
-                                result.CommunityRating = popcornRating.value.Value / 10f;
-                        }
-                        else if (targetSource == CommunityRatingSource.Metacritic)
-                        {
-                            var r = findRating("metacritic");
-                            if (r != null && r.value.HasValue && r.value.Value > 0)
-                                result.CommunityRating = r.value.Value / 10f;
-                        }
-                        else if (targetSource == CommunityRatingSource.MetacriticUser)
-                        {
-                            var r = findRating("metacriticuser");
-                            if (r != null && r.value.HasValue && r.value.Value > 0)
-                                result.CommunityRating = r.value.Value > 10f ? r.value.Value / 10f : r.value.Value;
-                        }
-                        else if (targetSource == CommunityRatingSource.MdbList)
-                        {
-                            var r = findRating("mdblist");
-                            if (r != null && r.value.HasValue && r.value.Value > 0)
-                                result.CommunityRating = r.value.Value / 10f;
-                            else if (data.score.HasValue && data.score.Value > 0)
-                                result.CommunityRating = data.score.Value / 10f;
-                        }
-                        else if (targetSource == CommunityRatingSource.Trakt)
-                        {
-                            var r = findRating("trakt");
-                            if (r != null && r.value.HasValue && r.value.Value > 0)
-                                result.CommunityRating = r.value.Value / 10f;
-                        }
-                        else if (targetSource == CommunityRatingSource.Tmdb)
-                        {
-                            var r = findRating("tmdb");
-                            if (r != null && r.value.HasValue && r.value.Value > 0)
-                                result.CommunityRating = r.value.Value / 10f;
-                        }
-                        else if (targetSource == CommunityRatingSource.Letterboxd)
-                        {
-                            var r = findRating("letterboxd");
-                            if (r != null && r.value.HasValue && r.value.Value > 0)
-                                result.CommunityRating = r.value.Value / 10f;
-                        }
-                        else if (targetSource == CommunityRatingSource.RogerEbert)
-                        {
-                            var r = findRating("rogerebert");
-                            if (r != null && r.value.HasValue && r.value.Value > 0)
-                                result.CommunityRating = r.value.Value * 2.5f;
-                        }
-                        else
-                        {
-                            // IMDb
-                            var imdbRating = findRating("imdb");
-                            if (imdbRating != null && imdbRating.value.HasValue && imdbRating.value.Value > 0)
-                                result.CommunityRating = imdbRating.value.Value;
-                            else if (data.score.HasValue && data.score.Value > 0)
-                                result.CommunityRating = data.score.Value / 10f;
+                            result.CommunityRating = ExtractMdbCommunityRating(data, findRating, fallbackSource);
+                            if (result.CommunityRating.HasValue)
+                                result.ActualCommunitySource = fallbackSource;
                         }
 
                         // Critic Rating
@@ -3183,11 +3354,13 @@ namespace RatingSync
             public bool UsedOmdb { get; set; }
             public bool UsedMdbList { get; set; }
             public bool UsedScraping { get; set; }
+            public bool OmdbHadNoEpisodeRating { get; set; }
             public bool ImdbScrapeAttempted { get; set; }
             public int ImdbScrapeRequests { get; set; }
             public bool MdbListRateLimited { get; set; }
             public string MdbListRateLimitMessage { get; set; }
             public DateTime? MdbListRateLimitUntilUtc { get; set; }
+            public CommunityRatingSource? ActualCommunitySource { get; set; }
         }
 
         private class OmdbResponse
@@ -3236,6 +3409,7 @@ namespace RatingSync
             public int? score_average { get; set; }
             public string type { get; set; }
             public List<MdbListRating> ratings { get; set; }
+            public List<MdbListSeason> seasons { get; set; }
         }
 
         private class MdbListRating
@@ -3243,6 +3417,19 @@ namespace RatingSync
             public string source { get; set; }
             public float? value { get; set; }
             public int? score { get; set; }
+            public int? votes { get; set; }
+        }
+
+        private class MdbListSeason
+        {
+            public int? season_number { get; set; }
+            public List<MdbListEpisode> episodes { get; set; }
+        }
+
+        private class MdbListEpisode
+        {
+            public int? episode_number { get; set; }
+            public int? rating { get; set; }
             public int? votes { get; set; }
         }
     }

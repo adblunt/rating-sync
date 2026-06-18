@@ -1,5 +1,5 @@
 <div is="emby-scroller"
-    data-controller="configurationpage?name=RatingSyncConfigurationjs_v115"
+    data-controller="configurationpage?name=RatingSyncConfigurationjs_v120"
     class="view flex flex-direction-column scrollFrameY flex-grow"
     data-horizontal="false"
     data-forcescrollbar="true"
@@ -457,11 +457,6 @@
                             <div class="settingsCard">
                                 <h3 class="subsectionTitle">IMDb Fallback</h3>
                                 <label class="checkboxContainer">
-                                    <input type="checkbox" is="emby-checkbox" id="chkEnableImdbScraping" />
-                                    <span>Enable IMDb episode fallback</span>
-                                </label>
-                                <div class="compactDescription">When OMDb has no episode rating, Rating Sync tries IMDb directly. Use sparingly — direct IMDb requests can trigger temporary blocks.</div>
-                                <label class="checkboxContainer" style="margin-top: 0.75em;">
                                     <input type="checkbox" is="emby-checkbox" id="chkImdbRateLimit" />
                                     <span>Enable daily limit</span>
                                 </label>
@@ -470,6 +465,11 @@
                                     <input id="txtImdbDailyLimit" type="number" is="emby-input" min="100" max="100000" />
                                     <div class="fieldDescription">Default: 1,000/day</div>
                                 </div>
+                                <label class="checkboxContainer" style="margin-top: 0.75em;">
+                                    <input type="checkbox" is="emby-checkbox" id="chkEnableImdbScraping" />
+                                    <span>Enable imdbapi.dev fallback</span>
+                                </label>
+                                <div class="compactDescription">When configured sources have no rating, Rating Sync falls back to imdbapi.dev (a free unofficial IMDb mirror). Applies to episodes, movies, and series.</div>
                             </div>
                         </div>
                     </div>
@@ -509,7 +509,22 @@
                                         <option value="RogerEbert">Roger Ebert</option>
                                     </select>
                                 </div>
-                                <div class="selectContainer">
+                                <div class="selectContainer" style="margin-top:0.35em;">
+                                    <label class="selectLabel" for="selectMoviesFallbackRatingSource">Movies fallback</label>
+                                    <select id="selectMoviesFallbackRatingSource" is="emby-select">
+                                        <option value="None">None</option>
+                                        <option value="IMDb">IMDb</option>
+                                        <option value="Popcorn">RT Audience (Popcorn)</option>
+                                        <option value="Metacritic">Metacritic Score</option>
+                                        <option value="MetacriticUser">Metacritic User Score</option>
+                                        <option value="MdbList">MDBList Score</option>
+                                        <option value="Trakt">Trakt</option>
+                                        <option value="Tmdb">TMDb</option>
+                                        <option value="Letterboxd">Letterboxd</option>
+                                        <option value="RogerEbert">Roger Ebert</option>
+                                    </select>
+                                </div>
+                                <div class="selectContainer" style="margin-top:0.75em;">
                                     <label class="selectLabel" for="selectSeriesRatingSource">TV Series</label>
                                     <select id="selectSeriesRatingSource" is="emby-select">
                                         <option value="IMDb">IMDb</option>
@@ -522,29 +537,55 @@
                                         <option value="Letterboxd">Letterboxd</option>
                                     </select>
                                 </div>
-                                <div class="fieldDescription">Episodes always use IMDb. All sources except IMDb require MDBList.</div>
+                                <div class="selectContainer" style="margin-top:0.35em;">
+                                    <label class="selectLabel" for="selectSeriesFallbackRatingSource">TV Series fallback</label>
+                                    <select id="selectSeriesFallbackRatingSource" is="emby-select">
+                                        <option value="None">None</option>
+                                        <option value="IMDb">IMDb</option>
+                                        <option value="Popcorn">RT Audience (Popcorn)</option>
+                                        <option value="Metacritic">Metacritic Score</option>
+                                        <option value="MetacriticUser">Metacritic User Score</option>
+                                        <option value="MdbList">MDBList Score</option>
+                                        <option value="Trakt">Trakt</option>
+                                        <option value="Tmdb">TMDb</option>
+                                        <option value="Letterboxd">Letterboxd</option>
+                                    </select>
+                                </div>
+                                <div class="fieldDescription">Episodes always use IMDb. All sources except IMDb require MDBList. Fallback source is used when the primary has no rating.</div>
                             </div>
 
                             <div class="settingsCard">
                                 <h3 class="subsectionTitle">Critic Rating Source</h3>
                                 <div class="selectContainer">
-                                    <label class="selectLabel" for="selectMoviesCriticRatingSource">Movies</label>
-                                    <select id="selectMoviesCriticRatingSource" is="emby-select">
+                                    <label class="selectLabel" for="selectMoviesCriticPrimary">Movies</label>
+                                    <select id="selectMoviesCriticPrimary" is="emby-select">
                                         <option value="RottenTomatoes">RT Tomatometer</option>
                                         <option value="Metacritic">Metacritic</option>
-                                        <option value="RottenTomatoesWithMetacriticFallback">RT, then Metacritic</option>
-                                        <option value="MetacriticWithRottenTomatoesFallback">Metacritic, then RT</option>
                                         <option value="None">None</option>
                                     </select>
                                 </div>
-                                <div class="selectContainer">
-                                    <label class="selectLabel" for="selectSeriesCriticRatingSource">TV Series</label>
-                                    <select id="selectSeriesCriticRatingSource" is="emby-select">
+                                <div class="selectContainer" style="margin-top:0.35em;">
+                                    <label class="selectLabel" for="selectMoviesCriticFallback">Movies fallback</label>
+                                    <select id="selectMoviesCriticFallback" is="emby-select">
+                                        <option value="None">None</option>
                                         <option value="RottenTomatoes">RT Tomatometer</option>
                                         <option value="Metacritic">Metacritic</option>
-                                        <option value="RottenTomatoesWithMetacriticFallback">RT, then Metacritic</option>
-                                        <option value="MetacriticWithRottenTomatoesFallback">Metacritic, then RT</option>
+                                    </select>
+                                </div>
+                                <div class="selectContainer" style="margin-top:0.75em;">
+                                    <label class="selectLabel" for="selectSeriesCriticPrimary">TV Series</label>
+                                    <select id="selectSeriesCriticPrimary" is="emby-select">
+                                        <option value="RottenTomatoes">RT Tomatometer</option>
+                                        <option value="Metacritic">Metacritic</option>
                                         <option value="None">None</option>
+                                    </select>
+                                </div>
+                                <div class="selectContainer" style="margin-top:0.35em;">
+                                    <label class="selectLabel" for="selectSeriesCriticFallback">TV Series fallback</label>
+                                    <select id="selectSeriesCriticFallback" is="emby-select">
+                                        <option value="None">None</option>
+                                        <option value="RottenTomatoes">RT Tomatometer</option>
+                                        <option value="Metacritic">Metacritic</option>
                                     </select>
                                 </div>
                                 <div class="fieldDescription">Writes to Emby's Critic Rating field. Setting both types to None is equivalent to disabling critic updates above.</div>
@@ -574,7 +615,7 @@
                                     <input type="checkbox" is="emby-checkbox" id="chkUpdateEpisodes" />
                                     <span>TV Episodes</span>
                                 </label>
-                                <div class="compactDescription">Episodes use OMDb. IMDb fallback can be enabled under API Setup if OMDb has no rating.</div>
+                                <div class="compactDescription">Episodes use OMDb or MDBList. imdbapi.dev fallback can be enabled under API Setup.</div>
                             </div>
                         </div>
 
@@ -716,6 +757,14 @@
                         <div id="elapsedTime" style="font-size: 0.85em; color: rgba(255,255,255,0.5);"></div>
                     </div>
 
+                    <div style="margin-bottom: 0.75em;">
+                        <label class="checkboxContainer">
+                            <input type="checkbox" is="emby-checkbox" id="chkForceRefresh" />
+                            <span>Force refresh</span>
+                        </label>
+                        <div class="compactDescription">By default, items scanned within the rescan interval are skipped. Enable this to process all selected items regardless of last scan time.</div>
+                    </div>
+
                     <div class="buttonGroup">
                         <button is="emby-button" type="button" id="btnRunRefresh" class="raised btn-primary">
                             <span>▶ Start Refresh</span>
@@ -756,6 +805,10 @@
                                 <div class="statNumber" id="statErrors">0</div>
                                 <div class="statLabel">Errors</div>
                             </div>
+                        </div>
+
+                        <div id="intervalFilterNotice" class="noteBox hide" style="margin-bottom: 0.75em;">
+                            <span id="intervalFilterMessage"></span> Enable <strong>Force Refresh</strong> to include them.
                         </div>
 
                         <div class="resultSection">

@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.1.5] - 2026-06-18
+
+- Feature: Critic Rating Source card now uses separate primary + fallback dropdowns, matching the Community Rating Source card layout.
+- Feature: MDBList episode ratings — episode IMDb ratings are now read from the seasons/episodes array embedded in the MDBList show response. One API call per series covers all its episodes (cached for the run).
+- Feature: imdbapi.dev fallback extended to movies and series — previously only fired for episodes; now fires for any item type when configured sources return no rating.
+- Feature: Unrated items are now processed before already-rated items in every run (selected and full scans), maximising API quota impact.
+- Fix: `ExtractMdbCommunityRating` no longer falls through to IMDb logic when source is `None`.
+- Polish: Renamed all "IMDb scraping" references to "imdbapi.dev" across UI labels, run log, Emby server log, and API usage counters — the feature was never scraping imdb.com directly.
+
+## [1.1.4] - 2026-06-16
+
+- Feature: Community rating source fallback — configure a secondary source per type (Movies / TV Series) that is tried when the primary source has no rating. The fallback is read from the same MDBList API response, so no extra network call is needed. Update log shows "IMDb [fallback from Trakt]: none → 7.5 (MDBList)" when the fallback fires.
+
+## [1.1.3] - 2026-06-16
+
+- Feature: Manual runs now respect the rescan interval by default — items scanned within the configured window are skipped, matching the behaviour of scheduled runs.
+- Feature: Added "Force refresh" checkbox to the Run tab to bypass the rescan interval on demand.
+- Fix: Interval filter notice now correctly appears when all selected items were skipped due to the rescan interval (previously the count was lost because `ProgressTracker.Start()` reset the progress object before the value was preserved).
+- Improvement: Source label now shows `OMDb→Scraped` when OMDb was tried but returned no episode rating and IMDb scraping succeeded, making the fallback chain visible in the UI.
+- Improvement: Log message added when OMDb returns no rating for an episode — now distinguishes between: scrape succeeded, scrape limit reached, scraping disabled, and scrape also returned nothing.
+- Improvement: UI skip reason now includes fallback context when OMDb has no episode rating — e.g. "No ratings found [OMDb] — IMDb scrape limit exhausted (250/250)" or "— IMDb scrape fallback not enabled".
+- Polish: Audited all UI and Emby log messages — removed "MDBList does not support episode lookups" noise from episode skip reasons, fixed "No critic rating in API" → "No critic rating found", unified IMDb scraping terminology, replaced "API" source label fallback with "unknown source".
+
 ## [1.1.2] - 2026-06-16
 
 - Improvement: Settings page restructured into three logical sections — API Setup (keys + mode + rate limits), Rating Sources (community + critic per type), Content (item types + scanning).

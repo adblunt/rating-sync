@@ -94,7 +94,7 @@ function (BaseView, loading, toast) {
                 mdbText = 'MDBList: ' + (data.MdbListUsed || 0) + (data.MdbListRateLimitEnabled && data.MdbListLimit ? ('/' + data.MdbListLimit) : '');
             }
 
-var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLimitEnabled && data.ImdbLimit ? ('/' + data.ImdbLimit) : '');
+var imdbText = 'imdbapi.dev: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLimitEnabled && data.ImdbLimit ? ('/' + data.ImdbLimit) : '');
 
             var html = '';
             if (todayLabel) {
@@ -475,6 +475,27 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
             return 'MDBListWithOMDbFallback';
         }
 
+        syncFallbackSelects(view) {
+            var pairs = [
+                ['#selectMoviesRatingSource', '#selectMoviesFallbackRatingSource'],
+                ['#selectSeriesRatingSource', '#selectSeriesFallbackRatingSource'],
+                ['#selectMoviesCriticPrimary', '#selectMoviesCriticFallback'],
+                ['#selectSeriesCriticPrimary', '#selectSeriesCriticFallback']
+            ];
+            pairs.forEach(function(pair) {
+                var primaryEl = view.querySelector(pair[0]);
+                var fallbackEl = view.querySelector(pair[1]);
+                if (!primaryEl || !fallbackEl) return;
+                var primaryVal = primaryEl.value;
+                Array.prototype.forEach.call(fallbackEl.options, function(opt) {
+                    opt.disabled = (opt.value !== 'None' && opt.value === primaryVal);
+                });
+                if (fallbackEl.value === primaryVal) {
+                    fallbackEl.value = 'None';
+                }
+            });
+        }
+
         enforceCommunityApiCompatibility(view, options) {
             var opts = options || {};
             var selectApiMode = view.querySelector('#selectApiMode');
@@ -484,8 +505,12 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
             var mdbListRequiredSources = ['Popcorn', 'Metacritic', 'MetacriticUser', 'MdbList', 'Trakt', 'Tmdb', 'Letterboxd', 'RogerEbert'];
             var moviesEl = view.querySelector('#selectMoviesRatingSource');
             var seriesEl = view.querySelector('#selectSeriesRatingSource');
+            var moviesFallbackEl = view.querySelector('#selectMoviesFallbackRatingSource');
+            var seriesFallbackEl = view.querySelector('#selectSeriesFallbackRatingSource');
             var needsMdb = (moviesEl && mdbListRequiredSources.indexOf(moviesEl.value) >= 0) ||
-                           (seriesEl && mdbListRequiredSources.indexOf(seriesEl.value) >= 0);
+                           (seriesEl && mdbListRequiredSources.indexOf(seriesEl.value) >= 0) ||
+                           (moviesFallbackEl && mdbListRequiredSources.indexOf(moviesFallbackEl.value) >= 0) ||
+                           (seriesFallbackEl && mdbListRequiredSources.indexOf(seriesFallbackEl.value) >= 0);
 
             if (needsMdb) {
                 var normalized = this.getMdbListCompatibleApiMode(selectApiMode.value);
@@ -542,7 +567,7 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                 var selectApiMode = view.querySelector('#selectApiMode');
                 if (selectApiMode) selectApiMode.value = apiModeValue || 'OMDbWithMDBListFallback';
                 
-                var communitySourceMapArray = ['IMDb', 'Popcorn', 'Metacritic', 'MetacriticUser', 'MdbList', 'Trakt', 'Tmdb', 'Letterboxd', 'RogerEbert'];
+                var communitySourceMapArray = ['IMDb', 'Popcorn', 'Metacritic', 'MetacriticUser', 'MdbList', 'Trakt', 'Tmdb', 'Letterboxd', 'RogerEbert', 'None'];
                 var criticSourceMapArray = ['RottenTomatoes', 'Metacritic', 'RottenTomatoesWithMetacriticFallback', 'MetacriticWithRottenTomatoesFallback', 'None'];
 
                 function loadCommunitySelect(selectId, rawValue, fallbackRawValue) {
@@ -555,17 +580,29 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                     var el = view.querySelector(selectId);
                     if (el) el.value = val || 'IMDb';
                 }
-                function loadCriticSelect(selectId, rawValue) {
+                function loadCriticSelects(primaryId, fallbackId, rawValue) {
                     var val = rawValue;
                     if (typeof val === 'number') val = criticSourceMapArray[val];
-                    var el = view.querySelector(selectId);
-                    if (el) el.value = val || 'RottenTomatoes';
+                    var primary, fallback;
+                    switch (val) {
+                        case 'RottenTomatoes':                      primary = 'RottenTomatoes'; fallback = 'None'; break;
+                        case 'Metacritic':                          primary = 'Metacritic';     fallback = 'None'; break;
+                        case 'RottenTomatoesWithMetacriticFallback': primary = 'RottenTomatoes'; fallback = 'Metacritic'; break;
+                        case 'MetacriticWithRottenTomatoesFallback': primary = 'Metacritic';     fallback = 'RottenTomatoes'; break;
+                        default:                                     primary = 'None';           fallback = 'None'; break;
+                    }
+                    var primaryEl = view.querySelector(primaryId);
+                    var fallbackEl = view.querySelector(fallbackId);
+                    if (primaryEl) primaryEl.value = primary;
+                    if (fallbackEl) fallbackEl.value = fallback;
                 }
 
                 loadCommunitySelect('#selectMoviesRatingSource', config.MoviesRatingSource, config.CommunityRatingSource);
                 loadCommunitySelect('#selectSeriesRatingSource', config.SeriesRatingSource, config.CommunityRatingSource);
-                loadCriticSelect('#selectMoviesCriticRatingSource', config.MoviesCriticRatingSource);
-                loadCriticSelect('#selectSeriesCriticRatingSource', config.SeriesCriticRatingSource);
+                loadCommunitySelect('#selectMoviesFallbackRatingSource', config.MoviesFallbackRatingSource, 9);
+                loadCommunitySelect('#selectSeriesFallbackRatingSource', config.SeriesFallbackRatingSource, 9);
+                loadCriticSelects('#selectMoviesCriticPrimary', '#selectMoviesCriticFallback', config.MoviesCriticRatingSource);
+                loadCriticSelects('#selectSeriesCriticPrimary', '#selectSeriesCriticFallback', config.SeriesCriticRatingSource);
 
                 var setChecked = function(id, val) {
                     var el = view.querySelector(id);
@@ -617,6 +654,7 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                 setChecked('#chkTestMode', config.TestMode === true);
 
                 self.enforceCommunityApiCompatibility(view, { notify: false });
+                self.syncFallbackSelects(view);
                 loading.hide();
             }).catch(function (err) {
                 console.error('RatingSync: Error loading config:', err);
@@ -685,7 +723,7 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                         break;
                 }
 
-                var communitySourceMap = { 'IMDb': 0, 'Popcorn': 1, 'Metacritic': 2, 'MetacriticUser': 3, 'MdbList': 4, 'Trakt': 5, 'Tmdb': 6, 'Letterboxd': 7, 'RogerEbert': 8 };
+                var communitySourceMap = { 'IMDb': 0, 'Popcorn': 1, 'Metacritic': 2, 'MetacriticUser': 3, 'MdbList': 4, 'Trakt': 5, 'Tmdb': 6, 'Letterboxd': 7, 'RogerEbert': 8, 'None': 9 };
                 var criticSourceMap = { 'RottenTomatoes': 0, 'Metacritic': 1, 'RottenTomatoesWithMetacriticFallback': 2, 'MetacriticWithRottenTomatoesFallback': 3, 'None': 4 };
 
                 var moviesSource = communitySourceMap[getValue('#selectMoviesRatingSource')] || 0;
@@ -704,10 +742,19 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
 
                 config.MoviesRatingSource = moviesSource;
                 config.SeriesRatingSource = seriesSource;
+                config.MoviesFallbackRatingSource = communitySourceMap[getValue('#selectMoviesFallbackRatingSource')] !== undefined ? communitySourceMap[getValue('#selectMoviesFallbackRatingSource')] : 9;
+                config.SeriesFallbackRatingSource = communitySourceMap[getValue('#selectSeriesFallbackRatingSource')] !== undefined ? communitySourceMap[getValue('#selectSeriesFallbackRatingSource')] : 9;
                 config.EpisodesRatingSource = 0;
                 config.CommunityRatingSource = moviesSource; // keep legacy field in sync
-                config.MoviesCriticRatingSource = criticSourceMap[getValue('#selectMoviesCriticRatingSource')] || 0;
-                config.SeriesCriticRatingSource = criticSourceMap[getValue('#selectSeriesCriticRatingSource')] || 0;
+                function getCriticCombinedValue(primaryId, fallbackId) {
+                    var p = getValue(primaryId);
+                    var f = getValue(fallbackId);
+                    if (p === 'RottenTomatoes' && f === 'Metacritic') return criticSourceMap['RottenTomatoesWithMetacriticFallback'];
+                    if (p === 'Metacritic' && f === 'RottenTomatoes') return criticSourceMap['MetacriticWithRottenTomatoesFallback'];
+                    return criticSourceMap[p] !== undefined ? criticSourceMap[p] : criticSourceMap['None'];
+                }
+                config.MoviesCriticRatingSource = getCriticCombinedValue('#selectMoviesCriticPrimary', '#selectMoviesCriticFallback');
+                config.SeriesCriticRatingSource = getCriticCombinedValue('#selectSeriesCriticPrimary', '#selectSeriesCriticFallback');
                 
                 config.UpdateCommunityRating = getChecked('#chkUpdateCommunityRating');
                 config.UpdateCriticRating = getChecked('#chkUpdateCriticRating');
@@ -845,6 +892,7 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
             var isRunning = progress.IsRunning || progress.isRunning || false;
             var startTime = progress.StartTime || progress.startTime;
             var eta = progress.EstimatedSecondsRemaining || progress.estimatedSecondsRemaining;
+            var filteredByInterval = progress.FilteredByInterval || progress.filteredByInterval || 0;
             var updatedDetails = progress.UpdatedDetails || progress.updatedDetails || {};
             var skippedDetails = progress.SkippedDetails || progress.skippedDetails || {};
             var failureDetails = progress.FailureDetails || progress.failureDetails || {};
@@ -865,6 +913,18 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
             view.querySelector('#updatedBadge').textContent = Object.keys(updatedDetails).length;
             view.querySelector('#skippedBadge').textContent = Object.keys(skippedDetails).length;
             view.querySelector('#failureBadge').textContent = Object.keys(failureDetails).length;
+
+            // Show interval filter notice
+            var notice = view.querySelector('#intervalFilterNotice');
+            var noticeMsg = view.querySelector('#intervalFilterMessage');
+            if (notice && noticeMsg) {
+                if (filteredByInterval > 0) {
+                    noticeMsg.textContent = filteredByInterval + ' item' + (filteredByInterval === 1 ? ' was' : 's were') + ' skipped — last scanned within the rescan interval.';
+                    notice.classList.remove('hide');
+                } else {
+                    notice.classList.add('hide');
+                }
+            }
 
             // Update current item
             var currentItemBox = view.querySelector('#currentItemBox');
@@ -969,6 +1029,7 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                 view.querySelector('#statUpdated').textContent = '0';
                 view.querySelector('#statSkipped').textContent = '0';
                 view.querySelector('#statErrors').textContent = '0';
+                var n = view.querySelector('#intervalFilterNotice'); if (n) n.classList.add('hide');
                 view.querySelector('#progressBarFill').style.width = '0%';
                 view.querySelector('#progressBarText').textContent = '0%';
                 view.querySelector('#currentItemBox').classList.add('hide');
@@ -1011,7 +1072,7 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                         } else {
                             self.setStatus(view, 'error', 'Task not found');
                             self.stopRefresh(view);
-                            toast({ text: 'Task not found - restart Emby Server' });
+                            toast({ text: 'Task not found — try restarting Emby Server' });
                         }
                     });
                 }
@@ -1029,7 +1090,8 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                             SeasonId: seasonId || '',
                             EpisodeId: episodeId || '',
                             MovieId: movieId || '',
-                            AddedWithinDays: addedWithinDays || 0
+                            AddedWithinDays: addedWithinDays || 0,
+                            ForceRefresh: view.querySelector('#chkForceRefresh') ? view.querySelector('#chkForceRefresh').checked : false
                         }),
                         contentType: 'application/json'
                     }).then(function() {
@@ -1154,6 +1216,7 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                 view.querySelector('#statUpdated').textContent = '0';
                 view.querySelector('#statSkipped').textContent = '0';
                 view.querySelector('#statErrors').textContent = '0';
+                var n = view.querySelector('#intervalFilterNotice'); if (n) n.classList.add('hide');
                 view.querySelector('#progressBarFill').style.width = '0%';
                 view.querySelector('#progressBarText').textContent = '0%';
                 view.querySelector('#elapsedTime').textContent = '';
@@ -1171,6 +1234,7 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                 view.querySelector('#statUpdated').textContent = '0';
                 view.querySelector('#statSkipped').textContent = '0';
                 view.querySelector('#statErrors').textContent = '0';
+                var n = view.querySelector('#intervalFilterNotice'); if (n) n.classList.add('hide');
                 view.querySelector('#updatedList').innerHTML = '<li class="resultEmpty">No items updated yet</li>';
                 view.querySelector('#skippedList').innerHTML = '<li class="resultEmpty">No items skipped yet</li>';
                 view.querySelector('#failureList').innerHTML = '<li class="resultEmpty">No failures</li>';
@@ -1226,12 +1290,15 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
             if (selectApiMode) {
                 selectApiMode.addEventListener('change', function() {
                     self.enforceCommunityApiCompatibility(view, { notify: false });
+                    self.syncFallbackSelects(view);
                 });
             }
-            ['#selectMoviesRatingSource', '#selectSeriesRatingSource'].forEach(function(id) {
+            ['#selectMoviesRatingSource', '#selectSeriesRatingSource', '#selectMoviesFallbackRatingSource', '#selectSeriesFallbackRatingSource',
+             '#selectMoviesCriticPrimary', '#selectMoviesCriticFallback', '#selectSeriesCriticPrimary', '#selectSeriesCriticFallback'].forEach(function(id) {
                 var el = view.querySelector(id);
                 if (el) el.addEventListener('change', function() {
                     self.enforceCommunityApiCompatibility(view, { notify: true });
+                    self.syncFallbackSelects(view);
                 });
             });
 
@@ -1669,7 +1736,7 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
             html += self.reportMetaBox('Errors', String(src.ErrorItems || 0));
             html += self.reportMetaBox('OMDb calls', String(src.OmdbRequests || 0));
             html += self.reportMetaBox('MDBList calls', String(src.MdbListRequests || 0));
-            html += self.reportMetaBox('IMDb scrapes', String(src.ImdbScrapeRequests || 0));
+            html += self.reportMetaBox('imdbapi.dev calls', String(src.ImdbScrapeRequests || 0));
             html += self.reportMetaBox('Status', statusText);
             html += '</div>';
 
@@ -2177,7 +2244,7 @@ var imdbText = 'IMDb scrapes: ' + (data.ImdbScrapesUsed || 0) + (data.ImdbRateLi
                     } else {
                         self.setStatus(view, 'error', 'Task not found');
                         self.stopRefresh(view);
-                        toast({ text: 'Task not found - restart Emby Server' });
+                        toast({ text: 'Task not found — try restarting Emby Server' });
                     }
                 });
             }
