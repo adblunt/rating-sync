@@ -6,6 +6,8 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [1.1.7] - 2026-08-03
+
 ### Fixed
 - **Critical**: HTTP socket exhaustion — plugin now uses a single shared `HttpClient` instead of instantiating one per API call. On .NET Framework, this prevented port exhaustion on large library scans and eliminated silent HTTP failures.
 - **Critical**: Scraping no longer silently fails — enabled automatic decompression (`gzip`/`deflate`) on the HTTP client so IMDb HTML responses are properly decompressed before parsing.
