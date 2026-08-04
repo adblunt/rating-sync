@@ -1028,12 +1028,12 @@ namespace RatingSync
             {
                 new PluginPageInfo
                 {
-                    Name = "RatingSyncConfiguration_v121",
+                    Name = "RatingSyncConfiguration_v122",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html"
                 },
                 new PluginPageInfo
                 {
-                    Name = "RatingSyncConfigurationjs_v121",
+                    Name = "RatingSyncConfigurationjs_v122",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.js"
                 }
             };
@@ -1899,6 +1899,7 @@ namespace RatingSync
                 List<BaseItem> items;
                 bool isSelectedScan = SelectedItemsStore.HasItems;
                 int skippedByInterval = 0;
+                int skippedHasRating = 0;
                 
                 if (isSelectedScan)
                 {
@@ -1917,6 +1918,15 @@ namespace RatingSync
                         skippedByInterval = beforeFilter - items.Count;
                         if (skippedByInterval > 0)
                             Log($"Skipped {skippedByInterval} item(s) scanned within the last {config.RescanIntervalDays} day(s). Enable Force Refresh to override.", "info");
+                    }
+
+                    if (!forceRefresh && config.SkipUnratedOnly)
+                    {
+                        var beforeSkip = items.Count;
+                        items = items.Where(i => !i.CommunityRating.HasValue && !i.CriticRating.HasValue).ToList();
+                        skippedHasRating = beforeSkip - items.Count;
+                        if (skippedHasRating > 0)
+                            Log($"Skipped {skippedHasRating} item(s) with existing ratings (Only scan unrated items is enabled). Enable Force Refresh to override.", "info");
                     }
 
                     Log($"Running targeted scan on {items.Count} selected item(s){(forceRefresh ? " (force refresh)" : "")}", "info");
@@ -1972,12 +1982,11 @@ namespace RatingSync
                     var episodeCount = items.Count(i => i is Episode);
                     Log($"Found {items.Count} items: {movieCount} movies, {seriesCount} series, {episodeCount} episodes", "info");
 
-                    // Apply smart scanning filters (only for full scans, not selected items)
+                    // Apply smart scanning filters
                     var originalCount = items.Count;
                     var rescanCutoff = DateTime.UtcNow.AddDays(-config.RescanIntervalDays);
                     var recentlyAddedCutoff = DateTime.UtcNow.AddDays(-config.RecentlyAddedDays);
                     int skippedByHistory = 0;
-                    int skippedHasRating = 0;
 
                     items = items.Where(i =>
                     {
@@ -1992,7 +2001,7 @@ namespace RatingSync
                         }
                         
                         // Optionally skip items that already have ratings
-                        if (config.SkipUnratedOnly && i.CommunityRating.HasValue)
+                        if (config.SkipUnratedOnly && (i.CommunityRating.HasValue || i.CriticRating.HasValue))
                         {
                             skippedHasRating++;
                             return false;

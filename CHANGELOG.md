@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.1.8] - 2026-08-04
+
+### Fixed
+- "Only scan unrated items" now applied consistently to both scheduled and manual selected scans, preventing manual scans from re-checking items that already have ratings.
+- "Only scan unrated items" now also skips items with a Critic Rating (previously only checked Community Rating). Description updated to reflect this.
+
 ## [Unreleased]
 
 ## [1.1.7] - 2026-08-03

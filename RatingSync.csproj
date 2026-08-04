@@ -10,10 +10,10 @@
       - AssemblyVersion/FileVersion must be numeric.
       - InformationalVersion can include prerelease identifiers.
     -->
-<VersionPrefix>1.1.7</VersionPrefix>
+<VersionPrefix>1.1.8</VersionPrefix>
       <VersionSuffix></VersionSuffix>
-      <AssemblyVersion>$(VersionPrefix).9</AssemblyVersion>
-      <FileVersion>$(VersionPrefix).9</FileVersion>
+      <AssemblyVersion>$(VersionPrefix).0</AssemblyVersion>
+      <FileVersion>$(VersionPrefix).0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <!-- Don't copy referenced assemblies to output -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
