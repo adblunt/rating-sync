@@ -12,17 +12,18 @@
 
 <p align="center">
 	<a href="#features">Features</a> •
+	<a href="#whats-different-in-this-fork">Fork changes</a> •
 	<a href="#install">Install</a> •
 	<a href="#quick-start">Quick start</a> •
 	<a href="#ui-tour">Screenshots</a> •
-	<a href="https://github.com/pejamas/rating-sync/releases">Download</a>
+	<a href="https://github.com/adblunt/rating-sync/releases">Download</a>
 </p>
 
 <p align="center">
-	<a href="https://github.com/pejamas/rating-sync/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/pejamas/rating-sync/actions/workflows/ci.yml/badge.svg" /></a>
-	<a href="https://github.com/pejamas/rating-sync/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/pejamas/rating-sync/total" /></a>
-	<a href="https://github.com/pejamas/rating-sync/releases"><img alt="Tag" src="https://img.shields.io/github/v/tag/pejamas/rating-sync?sort=semver" /></a>
-	<a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/pejamas/rating-sync" /></a>
+	<a href="https://github.com/adblunt/rating-sync/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/adblunt/rating-sync/actions/workflows/ci.yml/badge.svg" /></a>
+	<a href="https://github.com/adblunt/rating-sync/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/adblunt/rating-sync/total" /></a>
+	<a href="https://github.com/adblunt/rating-sync/releases"><img alt="Tag" src="https://img.shields.io/github/v/tag/adblunt/rating-sync?sort=semver" /></a>
+	<a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/adblunt/rating-sync" /></a>
 </p>
 
 ## Features
@@ -32,12 +33,40 @@
   - IMDb, RT Audience (Popcorn), Metacritic (Critic), Metacritic (User), MDBList Score, Trakt, TMDb, Letterboxd, Roger Ebert
 - **Critic Rating source** configurable per media type — RT Tomatometer, Metacritic, or fallback chains (RT→MC / MC→RT)
 - Supports **OMDb** and/or **MDBList** (configurable preferred source with fallback modes)
-- Optional **IMDb scraping fallback** for episode ratings
+- Optional **imdbapi.dev fallback** when configured sources return no community rating (movies, series, and episodes)
 - Built-in **rate limiting** + daily limits per API
 - **Smart scanning**: rescan interval, prioritize recently added, skip already-rated (optional)
 - **Progress API** + detailed results (updated/skipped/errors)
 - **Scan history** + per-session reports
 - Missing data views (e.g., missing IMDb id / ratings) and item-level scan history
+
+## What's different in this fork
+
+This is a fork of [pejamas/rating-sync](https://github.com/pejamas/rating-sync), which syncs IMDb community ratings and Rotten Tomatoes critic scores. This fork turns that into a multi-source ratings plugin with per-type control, a rebuilt settings UI, and a pile of scan-reliability fixes.
+
+**Sources and selection**
+- Community ratings can come from IMDb, RT Audience (Popcorn), Metacritic (score or user), MDBList Score, Trakt, TMDb, Letterboxd, or Roger Ebert — chosen independently for Movies vs TV Series
+- Critic ratings can come from RT Tomatometer, Metacritic, or a fallback chain (RT→MC / MC→RT), also per type
+- Primary + fallback community sources share the same MDBList response, so a fallback does not cost an extra API call
+- Episodes stay on IMDb, but can now pull episode scores from the MDBList show payload (one call per series covers all its episodes)
+
+**Scanning**
+- Manual runs respect the rescan interval by default; a **Force refresh** checkbox bypasses it
+- Unrated items are processed first so API quota goes to gaps, not re-checks
+- "Only scan unrated items" applies to scheduled *and* targeted manual scans, and treats an existing critic rating as already-rated
+- Targeted series/season runs always include episodes, even if the global "Update Episodes" toggle is off
+
+**Reliability**
+- Shared `HttpClient` (avoids socket exhaustion on large libraries)
+- Automatic gzip/deflate decompression so HTML fallbacks actually parse
+- Safer API ID parsing, directory-boundary library path matching, and rating comparisons at display precision
+- HTTP/file errors logged instead of swallowed
+
+**UI and packaging**
+- Settings page split into API Setup, Rating Sources, and Content, with a card layout
+- Target framework `net472` so the plugin ships as a single `RatingSync.dll`
+
+See [CHANGELOG.md](CHANGELOG.md) for version-by-version detail. Current version: **1.1.8**.
 
 ## Rating sources
 
@@ -68,7 +97,7 @@ Episodes are always sourced from IMDb. All sources except IMDb require an MDBLis
 1. Add at least one API key under **API Setup** (OMDb and/or MDBList).
 2. Under **Rating Sources**, pick community and critic sources for Movies and TV Series.
 3. Under **Content**, choose which item types to update.
-4. (Optional) Enable episode scraping fallback for episode ratings.
+4. (Optional) Enable the imdbapi.dev fallback when OMDb/MDBList have no community rating.
 5. Go to the **Run** tab and start a refresh.
 
 ## UI tour

@@ -2,7 +2,7 @@ define(['baseView', 'loading', 'toast', 'emby-input', 'emby-button', 'emby-selec
 function (BaseView, loading, toast) {
     'use strict';
 
-    var pluginId = '12345678-1234-1234-1234-123456789012';
+    var pluginId = '35f648d2-437a-48c3-9449-9e8c2dbfd143';
 
     return class extends BaseView {
         constructor(view, params) {
