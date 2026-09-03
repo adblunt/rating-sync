@@ -66,7 +66,7 @@ This is a fork of [pejamas/rating-sync](https://github.com/pejamas/rating-sync),
 - Settings page split into API Setup, Rating Sources, and Content, with a card layout
 - Target framework `net472` so the plugin ships as a single `RatingSync.dll`
 
-See [CHANGELOG.md](CHANGELOG.md) for version-by-version detail. Current version: **1.1.8**.
+See [CHANGELOG.md](CHANGELOG.md) for version-by-version detail. Current version: **1.1.9**.
 
 ## Rating sources
 

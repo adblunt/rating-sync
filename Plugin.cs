@@ -1028,12 +1028,12 @@ namespace RatingSync
             {
                 new PluginPageInfo
                 {
-                    Name = "RatingSyncConfiguration_v122",
+                    Name = "RatingSyncConfiguration_v123",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html"
                 },
                 new PluginPageInfo
                 {
-                    Name = "RatingSyncConfigurationjs_v122",
+                    Name = "RatingSyncConfigurationjs_v123",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.js"
                 }
             };

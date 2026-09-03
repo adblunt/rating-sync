@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.1.9] - 2026-09-03
+
+- Removal: Decorative vertical accent bar before settings section headings (looked like a stray "I").
+
 ## [1.1.8] - 2026-08-04
 
 ### Fixed
